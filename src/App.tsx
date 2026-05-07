@@ -26,11 +26,22 @@ interface Command {
 }
 
 export default function App() {
+  const [isDarkMode, setIsDarkMode] = useState<boolean>(() => {
+    if (typeof window !== "undefined") {
+      const saved = localStorage.getItem("darkMode");
+      if (saved !== null) {
+        return JSON.parse(saved);
+      }
+      return window.matchMedia("(prefers-color-scheme: dark)").matches;
+    }
+    return false;
+  });
+
   const [showImport, setShowImport] = useState<boolean>(false);
   const [importText, setImportText] = useState<string>("");
   const [exportAsCP, setExportAsCP] = useState<boolean>(false);
 
-  const [eventId, setEventId] = useState<string>("{{ModId}}_Event01");
+  const [eventId, setEventId] = useState<string>("MyMod_Event01");
   const [location, setLocation] = useState<string>("Railroad");
   const [conditions, setConditions] = useState<Condition[]>([
     { id: Date.now(), type: "Time", payload: { min: 600, max: 1200 } },
@@ -44,6 +55,16 @@ export default function App() {
 
   const [timeline, setTimeline] = useState<Command[]>([]);
   const [outputString, setOutputString] = useState<string>("");
+
+  useEffect(() => {
+    if (isDarkMode) {
+      document.documentElement.classList.add("dark");
+      localStorage.setItem("darkMode", "true");
+    } else {
+      document.documentElement.classList.remove("dark");
+      localStorage.setItem("darkMode", "false");
+    }
+  }, [isDarkMode]);
 
   useEffect(() => {
     compileEvent();
@@ -491,7 +512,7 @@ export default function App() {
             <span>Between</span>
             <input
               type="number"
-              className="border border-slate-300 p-1 w-20 rounded"
+              className="border border-slate-300 dark:border-slate-600 dark:bg-slate-800 dark:text-white p-1 w-20 rounded"
               value={cond.payload.min}
               onChange={(e) =>
                 updateCondition(cond.id, "min", Number(e.target.value))
@@ -500,7 +521,7 @@ export default function App() {
             <span>and</span>
             <input
               type="number"
-              className="border border-slate-300 p-1 w-20 rounded"
+              className="border border-slate-300 dark:border-slate-600 dark:bg-slate-800 dark:text-white p-1 w-20 rounded"
               value={cond.payload.max}
               onChange={(e) =>
                 updateCondition(cond.id, "max", Number(e.target.value))
@@ -513,7 +534,7 @@ export default function App() {
           <div className="flex items-center gap-2">
             <span>Actor:</span>
             <select
-              className="border border-slate-300 p-1 rounded"
+              className="border border-slate-300 dark:border-slate-600 dark:bg-slate-800 dark:text-white p-1 rounded"
               value={cond.payload.actor}
               onChange={(e) =>
                 updateCondition(cond.id, "actor", e.target.value)
@@ -533,7 +554,7 @@ export default function App() {
               type="number"
               min="1"
               max="14"
-              className="border border-slate-300 p-1 w-16 rounded"
+              className="border border-slate-300 dark:border-slate-600 dark:bg-slate-800 dark:text-white p-1 w-16 rounded"
               value={cond.payload.hearts}
               onChange={(e) =>
                 updateCondition(cond.id, "hearts", Number(e.target.value))
@@ -547,7 +568,7 @@ export default function App() {
           <div className="flex items-center gap-2">
             <span>Must be:</span>
             <select
-              className="border border-slate-300 p-1 rounded"
+              className="border border-slate-300 dark:border-slate-600 dark:bg-slate-800 dark:text-white p-1 rounded"
               value={cond.payload.season}
               onChange={(e) =>
                 updateCondition(cond.id, "season", e.target.value)
@@ -565,7 +586,7 @@ export default function App() {
           <div className="flex items-center gap-2">
             <span>Must be:</span>
             <select
-              className="border border-slate-300 p-1 rounded"
+              className="border border-slate-300 dark:border-slate-600 dark:bg-slate-800 dark:text-white p-1 rounded"
               value={cond.payload.weather}
               onChange={(e) =>
                 updateCondition(cond.id, "weather", e.target.value)
@@ -582,7 +603,7 @@ export default function App() {
             <span>Raw String:</span>
             <input
               type="text"
-              className="border border-slate-300 p-1 rounded flex-grow"
+              className="border border-slate-300 dark:border-slate-600 dark:bg-slate-800 dark:text-white p-1 rounded flex-grow"
               value={cond.payload.text}
               onChange={(e) => updateCondition(cond.id, "text", e.target.value)}
             />
@@ -596,7 +617,7 @@ export default function App() {
   const renderCommandInputs = (cmd: Command) => {
     const actorDropdown = (
       <select
-        className="border border-slate-300 p-1 mx-2 rounded"
+        className="border border-slate-300 dark:border-slate-600 dark:bg-slate-800 dark:text-white p-1 mx-2 rounded"
         value={cmd.payload.actor}
         onChange={(e) => updateCommand(cmd.id, "actor", e.target.value)}
       >
@@ -610,7 +631,7 @@ export default function App() {
 
     const facingDropdown = (
       <select
-        className="border border-slate-300 p-1 mx-2 rounded"
+        className="border border-slate-300 dark:border-slate-600 dark:bg-slate-800 dark:text-white p-1 mx-2 rounded"
         value={cmd.payload.facing}
         onChange={(e) =>
           updateCommand(cmd.id, "facing", Number(e.target.value))
@@ -631,7 +652,7 @@ export default function App() {
               <span>Actor:</span> {actorDropdown}
             </div>
             <textarea
-              className="border border-slate-300 p-2 rounded w-full h-20"
+              className="border border-slate-300 dark:border-slate-600 dark:bg-slate-800 dark:text-white p-2 rounded w-full h-20"
               value={cmd.payload.text}
               onChange={(e) => updateCommand(cmd.id, "text", e.target.value)}
             />
@@ -639,7 +660,7 @@ export default function App() {
               className={`text-sm ${
                 cmd.payload.text?.length > 177
                   ? "text-red-500 font-bold"
-                  : "text-slate-500"
+                  : "text-slate-500 dark:text-slate-400"
               }`}
             >
               Characters: {cmd.payload.text?.length || 0} / 177
@@ -653,7 +674,7 @@ export default function App() {
             <span>X Offset:</span>
             <input
               type="number"
-              className="border border-slate-300 p-1 w-16 rounded"
+              className="border border-slate-300 dark:border-slate-600 dark:bg-slate-800 dark:text-white p-1 w-16 rounded"
               value={cmd.payload.x}
               onChange={(e) =>
                 updateCommand(cmd.id, "x", Number(e.target.value))
@@ -662,7 +683,7 @@ export default function App() {
             <span>Y Offset:</span>
             <input
               type="number"
-              className="border border-slate-300 p-1 w-16 rounded"
+              className="border border-slate-300 dark:border-slate-600 dark:bg-slate-800 dark:text-white p-1 w-16 rounded"
               value={cmd.payload.y}
               onChange={(e) =>
                 updateCommand(cmd.id, "y", Number(e.target.value))
@@ -677,7 +698,7 @@ export default function App() {
             <span>Duration (ms):</span>
             <input
               type="number"
-              className="border border-slate-300 p-1 w-24 rounded"
+              className="border border-slate-300 dark:border-slate-600 dark:bg-slate-800 dark:text-white p-1 w-24 rounded"
               value={cmd.payload.duration}
               onChange={(e) =>
                 updateCommand(cmd.id, "duration", Number(e.target.value))
@@ -698,7 +719,7 @@ export default function App() {
             <span>Actor:</span> {actorDropdown}
             <span>Emote:</span>
             <select
-              className="border border-slate-300 p-1 mx-2 rounded"
+              className="border border-slate-300 dark:border-slate-600 dark:bg-slate-800 dark:text-white p-1 mx-2 rounded"
               value={cmd.payload.emoteId}
               onChange={(e) =>
                 updateCommand(cmd.id, "emoteId", Number(e.target.value))
@@ -722,7 +743,7 @@ export default function App() {
             <span>X:</span>
             <input
               type="number"
-              className="border border-slate-300 p-1 w-16 rounded"
+              className="border border-slate-300 dark:border-slate-600 dark:bg-slate-800 dark:text-white p-1 w-16 rounded"
               value={cmd.payload.x}
               onChange={(e) =>
                 updateCommand(cmd.id, "x", Number(e.target.value))
@@ -731,7 +752,7 @@ export default function App() {
             <span>Y:</span>
             <input
               type="number"
-              className="border border-slate-300 p-1 w-16 rounded"
+              className="border border-slate-300 dark:border-slate-600 dark:bg-slate-800 dark:text-white p-1 w-16 rounded"
               value={cmd.payload.y}
               onChange={(e) =>
                 updateCommand(cmd.id, "y", Number(e.target.value))
@@ -741,7 +762,7 @@ export default function App() {
         );
       case "globalFade":
         return (
-          <div className="text-slate-600 italic mt-2">
+          <div className="text-slate-600 dark:text-slate-400 italic mt-2">
             Screen will fade to black.
           </div>
         );
@@ -750,7 +771,7 @@ export default function App() {
           <div className="flex items-center gap-2 mt-2">
             <span>Ending Type:</span>
             <select
-              className="border border-slate-300 p-1 mx-2 rounded"
+              className="border border-slate-300 dark:border-slate-600 dark:bg-slate-800 dark:text-white p-1 mx-2 rounded"
               value={cmd.payload.style}
               onChange={(e) => updateCommand(cmd.id, "style", e.target.value)}
             >
@@ -767,7 +788,7 @@ export default function App() {
             <span>Raw Code:</span>
             <input
               type="text"
-              className="border border-slate-300 p-1 rounded flex-grow"
+              className="border border-slate-300 dark:border-slate-600 dark:bg-slate-800 dark:text-white p-1 rounded flex-grow"
               value={cmd.payload.text}
               onChange={(e) => updateCommand(cmd.id, "text", e.target.value)}
             />
@@ -779,22 +800,28 @@ export default function App() {
   };
 
   return (
-    <div className="min-h-screen bg-slate-100 p-8 pb-48 font-sans text-slate-800">
-      <div className="max-w-4xl mx-auto bg-white p-8 rounded-xl shadow-lg border border-slate-200">
+    <div className="min-h-screen bg-slate-100 dark:bg-slate-950 p-8 pb-48 font-sans text-slate-800 dark:text-slate-200 transition-colors">
+      <div className="max-w-4xl mx-auto bg-white dark:bg-slate-900 p-8 rounded-xl shadow-lg border border-slate-200 dark:border-slate-700 transition-colors">
         <div className="flex justify-between items-center mb-6">
-          <h1 className="text-3xl font-bold text-emerald-700">
+          <h1 className="text-3xl font-bold text-emerald-700 dark:text-emerald-400">
             Stardew Event Builder
           </h1>
           <div className="flex gap-2">
             <button
+              onClick={() => setIsDarkMode(!isDarkMode)}
+              className="bg-slate-200 hover:bg-slate-300 dark:bg-slate-800 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-300 font-bold py-2 px-4 rounded transition-colors"
+            >
+              {isDarkMode ? "Light" : "Dark"}
+            </button>
+            <button
               onClick={handleReset}
-              className="bg-red-100 hover:bg-red-200 text-red-700 font-bold py-2 px-4 rounded transition-colors"
+              className="bg-red-100 hover:bg-red-200 dark:bg-red-900/30 dark:hover:bg-red-900/50 text-red-700 dark:text-red-400 font-bold py-2 px-4 rounded transition-colors"
             >
               Reset All
             </button>
             <button
               onClick={() => setShowImport(!showImport)}
-              className="bg-slate-200 hover:bg-slate-300 text-slate-700 font-bold py-2 px-4 rounded transition-colors"
+              className="bg-slate-200 hover:bg-slate-300 dark:bg-slate-800 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-300 font-bold py-2 px-4 rounded transition-colors"
             >
               {showImport ? "Close Import" : "Import Existing Event"}
             </button>
@@ -802,20 +829,20 @@ export default function App() {
         </div>
 
         {showImport && (
-          <div className="mb-8 p-4 bg-amber-50 border border-amber-200 rounded-lg">
-            <h3 className="font-bold text-amber-800 mb-2">
+          <div className="mb-8 p-4 bg-amber-50 dark:bg-amber-950/30 border border-amber-200 dark:border-amber-800/50 rounded-lg">
+            <h3 className="font-bold text-amber-800 dark:text-amber-300 mb-2">
               Import from Content.json
             </h3>
-            <p className="text-sm text-amber-700 mb-3">
+            <p className="text-sm text-amber-700 dark:text-amber-400 mb-3">
               Paste a full event line here. (e.g.,{" "}
-              <code>
+              <code className="bg-amber-100 dark:bg-amber-900/50 px-1 rounded">
                 "MyEvent/Time 600": "continue/-1000 -1000/farmer 0 0 0/pause
                 1000/end"
               </code>
               )
             </p>
             <textarea
-              className="w-full border border-amber-300 p-2 rounded h-24 mb-2 font-mono text-sm"
+              className="w-full border border-amber-300 dark:border-amber-700 dark:bg-slate-800 dark:text-white p-2 rounded h-24 mb-2 font-mono text-sm"
               placeholder='"EventId/Condition": "music/x y/actor data/commands..."'
               value={importText}
               onChange={(e) => setImportText(e.target.value)}
@@ -829,87 +856,87 @@ export default function App() {
           </div>
         )}
 
-        <section className="mb-8 border-b border-slate-200 pb-6">
-          <h2 className="text-xl font-semibold mb-4 text-slate-700">
+        <section className="mb-8 border-b border-slate-200 dark:border-slate-700 pb-6">
+          <h2 className="text-xl font-semibold mb-4 text-slate-700 dark:text-slate-300">
             1. Event Details
           </h2>
           <div className="grid grid-cols-2 gap-4 mb-4">
             <div>
-              <label className="block text-sm font-bold mb-1 text-slate-600">
+              <label className="block text-sm font-bold mb-1 text-slate-600 dark:text-slate-400">
                 Event ID (Unique Name)
               </label>
               <input
                 type="text"
-                className="w-full border border-slate-300 p-2 rounded bg-slate-50"
+                className="w-full border border-slate-300 dark:border-slate-600 p-2 rounded bg-slate-50 dark:bg-slate-800 dark:text-white"
                 value={eventId}
                 onChange={(e) => setEventId(e.target.value)}
               />
             </div>
             <div>
-              <label className="block text-sm font-bold mb-1 text-slate-600">
+              <label className="block text-sm font-bold mb-1 text-slate-600 dark:text-slate-400">
                 Target Location (Map Name)
               </label>
               <input
                 type="text"
-                className="w-full border border-slate-300 p-2 rounded bg-slate-50"
+                className="w-full border border-slate-300 dark:border-slate-600 p-2 rounded bg-slate-50 dark:bg-slate-800 dark:text-white"
                 value={location}
                 onChange={(e) => setLocation(e.target.value)}
               />
             </div>
           </div>
 
-          <div className="bg-slate-50 p-4 rounded border border-slate-200">
-            <h3 className="font-bold mb-3 text-sm text-slate-600 uppercase tracking-wide">
+          <div className="bg-slate-50 dark:bg-slate-800/50 p-4 rounded border border-slate-200 dark:border-slate-700">
+            <h3 className="font-bold mb-3 text-sm text-slate-600 dark:text-slate-400 uppercase tracking-wide">
               Required Conditions to Trigger
             </h3>
             {conditions.map((cond) => (
               <div
                 key={cond.id}
-                className="flex gap-4 mb-3 items-center bg-white p-2 border border-slate-200 rounded"
+                className="flex gap-4 mb-3 items-center bg-white dark:bg-slate-800 p-2 border border-slate-200 dark:border-slate-700 rounded"
               >
-                <div className="font-bold text-emerald-600 text-sm w-24">
+                <div className="font-bold text-emerald-600 dark:text-emerald-400 text-sm w-24">
                   {cond.type}
                 </div>
                 <div className="flex-grow">{renderConditionInputs(cond)}</div>
                 <button
                   onClick={() => removeCondition(cond.id)}
-                  className="text-red-400 hover:text-red-600 px-2 font-bold"
+                  className="text-red-400 hover:text-red-600 font-bold px-2"
                 >
                   X
                 </button>
               </div>
             ))}
             <div className="flex gap-2 mt-4">
-              <span className="text-sm text-slate-500 self-center mr-2">
+              <span className="text-sm text-slate-500 dark:text-slate-400 self-center mr-2">
                 Add Requirement:
               </span>
               <button
                 onClick={() => addCondition("Time")}
-                className="bg-emerald-100 text-emerald-700 px-3 py-1 rounded text-sm font-bold"
+                className="bg-emerald-100 dark:bg-emerald-900/30 text-emerald-700 dark:text-emerald-400 px-3 py-1 rounded text-sm font-bold"
               >
                 + Time
               </button>
               <button
                 onClick={() => addCondition("Friendship")}
-                className="bg-emerald-100 text-emerald-700 px-3 py-1 rounded text-sm font-bold"
+                className="bg-emerald-100 dark:bg-emerald-900/30 text-emerald-700 dark:text-emerald-400 px-3 py-1 rounded text-sm font-bold"
               >
                 + Friendship
               </button>
               <button
                 onClick={() => addCondition("Season")}
-                className="bg-emerald-100 text-emerald-700 px-3 py-1 rounded text-sm font-bold"
+                className="bg-emerald-100 dark:bg-emerald-900/30 text-emerald-700 dark:text-emerald-400 px-3 py-1 rounded text-sm font-bold"
               >
                 + Season
               </button>
               <button
                 onClick={() => addCondition("Weather")}
-                className="bg-emerald-100 text-emerald-700 px-3 py-1 rounded text-sm font-bold"
+                className="bg-emerald-100 dark:bg-emerald-900/30 text-emerald-700 dark:text-emerald-400 px-3 py-1 rounded text-sm font-bold"
               >
                 + Weather
               </button>
               <button
                 onClick={() => addCondition("Custom")}
-                className="bg-slate-200 text-slate-700 px-3 py-1 rounded text-sm font-bold"
+                className="bg-slate-200 dark:bg-slate-800 text-slate-700 dark:text-slate-300 px-3 py-1 rounded text-sm font-bold"
               >
                 + Custom Condition
               </button>
@@ -917,30 +944,30 @@ export default function App() {
           </div>
         </section>
 
-        <section className="mb-8 border-b border-slate-200 pb-6">
-          <h2 className="text-xl font-semibold mb-4 text-slate-700">
+        <section className="mb-8 border-b border-slate-200 dark:border-slate-700 pb-6">
+          <h2 className="text-xl font-semibold mb-4 text-slate-700 dark:text-slate-300">
             2. Scene Setup & Cast List
           </h2>
           <div className="grid grid-cols-2 gap-4 mb-4">
             <div>
-              <label className="block text-sm font-bold mb-1 text-slate-600">
+              <label className="block text-sm font-bold mb-1 text-slate-600 dark:text-slate-400">
                 Background Music
               </label>
               <input
                 type="text"
-                className="w-full border border-slate-300 p-2 rounded bg-slate-50"
+                className="w-full border border-slate-300 dark:border-slate-600 p-2 rounded bg-slate-50 dark:bg-slate-800 dark:text-white"
                 value={music}
                 onChange={(e) => setMusic(e.target.value)}
               />
             </div>
             <div className="flex gap-2">
               <div className="w-1/2">
-                <label className="block text-sm font-bold mb-1 text-slate-600">
+                <label className="block text-sm font-bold mb-1 text-slate-600 dark:text-slate-400">
                   Camera X
                 </label>
                 <input
                   type="number"
-                  className="w-full border border-slate-300 p-2 rounded bg-slate-50"
+                  className="w-full border border-slate-300 dark:border-slate-600 p-2 rounded bg-slate-50 dark:bg-slate-800 dark:text-white"
                   value={viewport.x}
                   onChange={(e) =>
                     setViewport({ ...viewport, x: Number(e.target.value) })
@@ -948,12 +975,12 @@ export default function App() {
                 />
               </div>
               <div className="w-1/2">
-                <label className="block text-sm font-bold mb-1 text-slate-600">
+                <label className="block text-sm font-bold mb-1 text-slate-600 dark:text-slate-400">
                   Camera Y
                 </label>
                 <input
                   type="number"
-                  className="w-full border border-slate-300 p-2 rounded bg-slate-50"
+                  className="w-full border border-slate-300 dark:border-slate-600 p-2 rounded bg-slate-50 dark:bg-slate-800 dark:text-white"
                   value={viewport.y}
                   onChange={(e) =>
                     setViewport({ ...viewport, y: Number(e.target.value) })
@@ -963,15 +990,15 @@ export default function App() {
             </div>
           </div>
 
-          <div className="bg-slate-50 p-4 rounded border border-slate-200">
-            <h3 className="font-bold mb-3 text-sm text-slate-600 uppercase tracking-wide">
+          <div className="bg-slate-50 dark:bg-slate-800/50 p-4 rounded border border-slate-200 dark:border-slate-700">
+            <h3 className="font-bold mb-3 text-sm text-slate-600 dark:text-slate-400 uppercase tracking-wide">
               Starting Actors
             </h3>
             {cast.map((actor) => (
               <div key={actor.id} className="flex gap-2 mb-2 items-center">
                 <input
                   type="text"
-                  className="border border-slate-300 p-2 w-1/3 rounded"
+                  className="border border-slate-300 dark:border-slate-600 dark:bg-slate-800 dark:text-white p-2 w-1/3 rounded"
                   placeholder="Actor Name"
                   value={actor.name}
                   disabled={actor.name === "farmer"}
@@ -982,7 +1009,7 @@ export default function App() {
                 <span className="text-slate-400 text-sm">X:</span>
                 <input
                   type="number"
-                  className="border border-slate-300 p-2 w-16 rounded"
+                  className="border border-slate-300 dark:border-slate-600 dark:bg-slate-800 dark:text-white p-2 w-16 rounded"
                   value={actor.x}
                   onChange={(e) =>
                     updateCastMember(actor.id, "x", Number(e.target.value))
@@ -991,14 +1018,14 @@ export default function App() {
                 <span className="text-slate-400 text-sm">Y:</span>
                 <input
                   type="number"
-                  className="border border-slate-300 p-2 w-16 rounded"
+                  className="border border-slate-300 dark:border-slate-600 dark:bg-slate-800 dark:text-white p-2 w-16 rounded"
                   value={actor.y}
                   onChange={(e) =>
                     updateCastMember(actor.id, "y", Number(e.target.value))
                   }
                 />
                 <select
-                  className="border border-slate-300 p-2 rounded ml-2"
+                  className="border border-slate-300 dark:border-slate-600 dark:bg-slate-800 dark:text-white p-2 rounded ml-2"
                   value={actor.facing}
                   onChange={(e) =>
                     updateCastMember(actor.id, "facing", Number(e.target.value))
@@ -1021,7 +1048,7 @@ export default function App() {
             ))}
             <button
               onClick={addCastMember}
-              className="mt-3 bg-emerald-100 text-emerald-700 px-4 py-2 rounded text-sm font-bold"
+              className="mt-3 bg-emerald-100 dark:bg-emerald-900/30 text-emerald-700 dark:text-emerald-400 px-4 py-2 rounded text-sm font-bold"
             >
               + Add Character
             </button>
@@ -1029,27 +1056,27 @@ export default function App() {
         </section>
 
         <section>
-          <h2 className="text-xl font-semibold mb-4 text-slate-700">
+          <h2 className="text-xl font-semibold mb-4 text-slate-700 dark:text-slate-300">
             3. Timeline Workspace
           </h2>
           <div className="flex flex-col gap-3">
             {timeline.map((cmd, index) => (
               <div
                 key={cmd.id}
-                className="border border-slate-200 rounded-lg p-4 bg-slate-50 shadow-sm flex items-start gap-4"
+                className="border border-slate-200 dark:border-slate-700 rounded-lg p-4 bg-slate-50 dark:bg-slate-800/50 shadow-sm flex items-start gap-4 transition-colors"
               >
                 <div className="flex flex-col gap-1 mt-1">
                   <button
                     onClick={() => moveCommand(index, -1)}
                     disabled={index === 0}
-                    className="text-slate-400 hover:text-emerald-600 disabled:opacity-30"
+                    className="text-slate-400 hover:text-emerald-600 dark:hover:text-emerald-400 disabled:opacity-30"
                   >
                     ▲
                   </button>
                   <button
                     onClick={() => moveCommand(index, 1)}
                     disabled={index === timeline.length - 1}
-                    className="text-slate-400 hover:text-emerald-600 disabled:opacity-30"
+                    className="text-slate-400 hover:text-emerald-600 dark:hover:text-emerald-400 disabled:opacity-30"
                   >
                     ▼
                   </button>
@@ -1068,7 +1095,7 @@ export default function App() {
                     Delete
                   </button>
                   <select
-                    className="text-xs border border-slate-300 rounded p-1 text-slate-600 bg-white"
+                    className="text-xs border border-slate-300 dark:border-slate-600 rounded p-1 text-slate-600 dark:text-slate-300 bg-white dark:bg-slate-800"
                     defaultValue=""
                     onChange={(e) => {
                       if (e.target.value) {
@@ -1095,62 +1122,62 @@ export default function App() {
             ))}
           </div>
 
-          <div className="mt-8 bg-slate-100 p-4 rounded-lg border border-slate-200">
-            <h3 className="text-sm font-bold text-slate-500 mb-3 uppercase tracking-wide">
+          <div className="mt-8 bg-slate-100 dark:bg-slate-900 p-4 rounded-lg border border-slate-200 dark:border-slate-700 transition-colors">
+            <h3 className="text-sm font-bold text-slate-500 dark:text-slate-400 mb-3 uppercase tracking-wide">
               Add an Action
             </h3>
             <div className="flex flex-wrap gap-2">
               <button
                 onClick={() => insertCommand("speak", timeline.length)}
-                className="bg-white border border-emerald-500 text-emerald-700 font-semibold px-4 py-2 rounded"
+                className="bg-white dark:bg-slate-800 border border-emerald-500 text-emerald-700 dark:text-emerald-400 font-semibold px-4 py-2 rounded"
               >
                 + Speak
               </button>
               <button
                 onClick={() => insertCommand("move", timeline.length)}
-                className="bg-white border border-emerald-500 text-emerald-700 font-semibold px-4 py-2 rounded"
+                className="bg-white dark:bg-slate-800 border border-emerald-500 text-emerald-700 dark:text-emerald-400 font-semibold px-4 py-2 rounded"
               >
                 + Move
               </button>
               <button
                 onClick={() => insertCommand("pause", timeline.length)}
-                className="bg-white border border-emerald-500 text-emerald-700 font-semibold px-4 py-2 rounded"
+                className="bg-white dark:bg-slate-800 border border-emerald-500 text-emerald-700 dark:text-emerald-400 font-semibold px-4 py-2 rounded"
               >
                 + Pause
               </button>
               <button
                 onClick={() => insertCommand("faceDirection", timeline.length)}
-                className="bg-white border border-emerald-500 text-emerald-700 font-semibold px-4 py-2 rounded"
+                className="bg-white dark:bg-slate-800 border border-emerald-500 text-emerald-700 dark:text-emerald-400 font-semibold px-4 py-2 rounded"
               >
                 + Turn
               </button>
               <button
                 onClick={() => insertCommand("warp", timeline.length)}
-                className="bg-white border border-emerald-500 text-emerald-700 font-semibold px-4 py-2 rounded"
+                className="bg-white dark:bg-slate-800 border border-emerald-500 text-emerald-700 dark:text-emerald-400 font-semibold px-4 py-2 rounded"
               >
                 + Warp
               </button>
               <button
                 onClick={() => insertCommand("emote", timeline.length)}
-                className="bg-white border border-emerald-500 text-emerald-700 font-semibold px-4 py-2 rounded"
+                className="bg-white dark:bg-slate-800 border border-emerald-500 text-emerald-700 dark:text-emerald-400 font-semibold px-4 py-2 rounded"
               >
                 + Emote
               </button>
               <button
                 onClick={() => insertCommand("globalFade", timeline.length)}
-                className="bg-white border border-slate-400 text-slate-700 font-semibold px-4 py-2 rounded"
+                className="bg-white dark:bg-slate-800 border border-slate-400 dark:border-slate-600 text-slate-700 dark:text-slate-300 font-semibold px-4 py-2 rounded"
               >
                 + Fade Screen
               </button>
               <button
                 onClick={() => insertCommand("customAction", timeline.length)}
-                className="bg-white border border-slate-400 text-slate-700 font-semibold px-4 py-2 rounded"
+                className="bg-white dark:bg-slate-800 border border-slate-400 dark:border-slate-600 text-slate-700 dark:text-slate-300 font-semibold px-4 py-2 rounded"
               >
                 + Custom Action
               </button>
               <button
                 onClick={() => insertCommand("end", timeline.length)}
-                className="bg-red-50 border border-red-500 text-red-700 font-semibold px-4 py-2 rounded"
+                className="bg-red-50 dark:bg-red-900/20 border border-red-500 text-red-700 dark:text-red-400 font-semibold px-4 py-2 rounded"
               >
                 + End Event
               </button>
