@@ -30,7 +30,7 @@ export default function App() {
   const [importText, setImportText] = useState<string>("");
   const [exportAsCP, setExportAsCP] = useState<boolean>(false);
 
-  const [eventId, setEventId] = useState<string>("MyMod_Event01");
+  const [eventId, setEventId] = useState<string>("{{ModId}}_Event01");
   const [location, setLocation] = useState<string>("Railroad");
   const [conditions, setConditions] = useState<Condition[]>([
     { id: Date.now(), type: "Time", payload: { min: 600, max: 1200 } },
