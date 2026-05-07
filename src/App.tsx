@@ -37,12 +37,25 @@ export default function App() {
     return false;
   });
 
+  const [isMenuOpen, setIsMenuOpen] = useState<boolean>(false);
   const [showImport, setShowImport] = useState<boolean>(false);
   const [importText, setImportText] = useState<string>("");
-  const [exportAsCP, setExportAsCP] = useState<boolean>(false);
 
-  const [eventId, setEventId] = useState<string>("MyMod_Event01");
-  const [location, setLocation] = useState<string>("Railroad");
+  const [exportAsCP, setExportAsCP] = useState<boolean>(() => {
+    const saved = localStorage.getItem("defaultExportAsCP");
+    return saved !== null ? JSON.parse(saved) : false;
+  });
+
+  const [eventId, setEventId] = useState<string>(() => {
+    const saved = localStorage.getItem("defaultEventId");
+    return saved !== null ? JSON.parse(saved) : "{{ModId}}_Event01";
+  });
+
+  const [location, setLocation] = useState<string>(() => {
+    const saved = localStorage.getItem("defaultLocation");
+    return saved !== null ? JSON.parse(saved) : "Railroad";
+  });
+
   const [conditions, setConditions] = useState<Condition[]>([
     { id: Date.now(), type: "Time", payload: { min: 600, max: 1200 } },
   ]);
@@ -148,6 +161,16 @@ export default function App() {
     } else {
       setOutputString(finalEvent);
     }
+  };
+
+  const handleSaveDefaults = () => {
+    localStorage.setItem("defaultEventId", JSON.stringify(eventId));
+    localStorage.setItem("defaultLocation", JSON.stringify(location));
+    localStorage.setItem("defaultExportAsCP", JSON.stringify(exportAsCP));
+    setIsMenuOpen(false);
+    alert(
+      "Current Event ID, Target Location, and Export Format have been saved as your defaults!"
+    );
   };
 
   const handleImport = () => {
@@ -372,8 +395,20 @@ export default function App() {
         "Are you sure you want to clear the entire event? This cannot be undone."
       )
     ) {
-      setEventId("MyMod_Event01");
-      setLocation("Railroad");
+      const savedEventId = localStorage.getItem("defaultEventId");
+      const savedLocation = localStorage.getItem("defaultLocation");
+      const savedExportAsCP = localStorage.getItem("defaultExportAsCP");
+
+      setEventId(
+        savedEventId !== null ? JSON.parse(savedEventId) : "{{ModId}}_Event01"
+      );
+      setLocation(
+        savedLocation !== null ? JSON.parse(savedLocation) : "Railroad"
+      );
+      setExportAsCP(
+        savedExportAsCP !== null ? JSON.parse(savedExportAsCP) : false
+      );
+
       setConditions([
         { id: Date.now(), type: "Time", payload: { min: 600, max: 1200 } },
       ]);
@@ -802,17 +837,59 @@ export default function App() {
   return (
     <div className="min-h-screen bg-slate-100 dark:bg-slate-950 p-8 pb-48 font-sans text-slate-800 dark:text-slate-200 transition-colors">
       <div className="max-w-4xl mx-auto bg-white dark:bg-slate-900 p-8 rounded-xl shadow-lg border border-slate-200 dark:border-slate-700 transition-colors">
-        <div className="flex justify-between items-center mb-6">
-          <h1 className="text-3xl font-bold text-emerald-700 dark:text-emerald-400">
-            Stardew Event Builder
-          </h1>
-          <div className="flex gap-2">
-            <button
-              onClick={() => setIsDarkMode(!isDarkMode)}
-              className="bg-slate-200 hover:bg-slate-300 dark:bg-slate-800 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-300 font-bold py-2 px-4 rounded transition-colors"
+        <div className="flex justify-between items-start mb-6">
+          <div>
+            <h1 className="text-3xl font-bold text-emerald-700 dark:text-emerald-400">
+              Stardew Event Builder
+            </h1>
+            <a
+              href="https://stardewvalleywiki.com/Modding:Event_data"
+              target="_blank"
+              rel="noreferrer"
+              className="text-sm text-emerald-600 dark:text-emerald-500 hover:underline mt-1 inline-block font-semibold"
             >
-              {isDarkMode ? "Light" : "Dark"}
-            </button>
+              Wiki: Event Data Documentation ↗
+            </a>
+          </div>
+          <div className="flex gap-2 items-start relative">
+            <div className="relative">
+              <button
+                onClick={() => setIsMenuOpen(!isMenuOpen)}
+                className="bg-slate-200 hover:bg-slate-300 dark:bg-slate-800 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-300 font-bold py-2 px-4 rounded transition-colors"
+              >
+                ⚙️ Settings
+              </button>
+              {isMenuOpen && (
+                <div className="absolute right-0 mt-2 w-56 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded shadow-lg z-50 flex flex-col overflow-hidden">
+                  <button
+                    onClick={() => {
+                      setIsDarkMode(false);
+                      setIsMenuOpen(false);
+                    }}
+                    className="px-4 py-3 text-left hover:bg-slate-100 dark:hover:bg-slate-700 font-medium"
+                  >
+                    Light Mode {!isDarkMode && "✓"}
+                  </button>
+                  <button
+                    onClick={() => {
+                      setIsDarkMode(true);
+                      setIsMenuOpen(false);
+                    }}
+                    className="px-4 py-3 text-left hover:bg-slate-100 dark:hover:bg-slate-700 font-medium"
+                  >
+                    Dark Mode {isDarkMode && "✓"}
+                  </button>
+                  <div className="border-t border-slate-200 dark:border-slate-700"></div>
+                  <button
+                    onClick={handleSaveDefaults}
+                    className="px-4 py-3 text-left hover:bg-slate-100 dark:hover:bg-slate-700 text-emerald-600 dark:text-emerald-400 font-medium"
+                  >
+                    💾 Save Current as Default
+                  </button>
+                </div>
+              )}
+            </div>
+
             <button
               onClick={handleReset}
               className="bg-red-100 hover:bg-red-200 dark:bg-red-900/30 dark:hover:bg-red-900/50 text-red-700 dark:text-red-400 font-bold py-2 px-4 rounded transition-colors"
