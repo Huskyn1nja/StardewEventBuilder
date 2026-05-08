@@ -1,8 +1,8 @@
 import { useState, useEffect } from "react";
 
 interface Viewport {
-  x: number;
-  y: number;
+  x: number | string;
+  y: number | string;
 }
 
 interface Condition {
@@ -15,8 +15,8 @@ interface Condition {
 interface CastMember {
   id: number;
   name: string;
-  x: number;
-  y: number;
+  x: number | string;
+  y: number | string;
   facing: number;
 }
 
@@ -169,15 +169,17 @@ export default function App() {
         return `textAboveHead ${cmd.payload.actor} \\"${safeText}\\"`;
       case "move":
         const moveStrs = cmd.payload.movements.map(
-          (m: any) => `${m.actor} ${m.x} ${m.y} ${m.facing}`
+          (m: any) => `${m.actor} ${m.x || 0} ${m.y || 0} ${m.facing}`
         );
         return `move ${moveStrs.join(" ")}${
           cmd.payload.isAsync ? " true" : ""
         }`;
       case "viewportMove":
-        return `viewport move ${cmd.payload.x} ${cmd.payload.y} ${cmd.payload.duration}`;
+        return `viewport move ${cmd.payload.x || 0} ${cmd.payload.y || 0} ${
+          cmd.payload.duration || 0
+        }`;
       case "pause":
-        return `pause ${cmd.payload.duration}`;
+        return `pause ${cmd.payload.duration || 0}`;
       case "faceDirection":
         return `faceDirection ${cmd.payload.actor} ${cmd.payload.facing}${
           cmd.payload.isAsync ? " true" : ""
@@ -187,17 +189,27 @@ export default function App() {
           cmd.payload.isAsync ? " true" : ""
         }`;
       case "warp":
-        return `warp ${cmd.payload.actor} ${cmd.payload.x} ${cmd.payload.y}`;
+        return `warp ${cmd.payload.actor} ${cmd.payload.x || 0} ${
+          cmd.payload.y || 0
+        }`;
       case "shake":
-        return `shake ${cmd.payload.actor} ${cmd.payload.duration}`;
+        return `shake ${cmd.payload.actor} ${cmd.payload.duration || 0}`;
       case "addTemporaryActor":
-        return `addTemporaryActor ${cmd.payload.sprite} ${cmd.payload.w} ${cmd.payload.h} ${cmd.payload.x} ${cmd.payload.y} ${cmd.payload.facing} true Character ${cmd.payload.name}`;
+        return `addTemporaryActor ${cmd.payload.sprite} ${cmd.payload.w || 0} ${
+          cmd.payload.h || 0
+        } ${cmd.payload.x || 0} ${cmd.payload.y || 0} ${
+          cmd.payload.facing
+        } true Character ${cmd.payload.name}`;
       case "addObject":
-        return `addObject ${cmd.payload.x} ${cmd.payload.y} ${cmd.payload.itemId}`;
+        return `addObject ${cmd.payload.x || 0} ${cmd.payload.y || 0} ${
+          cmd.payload.itemId || "0"
+        }`;
       case "addBigProp":
-        return `addBigProp ${cmd.payload.x} ${cmd.payload.y} ${cmd.payload.itemId}`;
+        return `addBigProp ${cmd.payload.x || 0} ${cmd.payload.y || 0} ${
+          cmd.payload.itemId || "0"
+        }`;
       case "removeObject":
-        return `removeObject ${cmd.payload.x} ${cmd.payload.y}`;
+        return `removeObject ${cmd.payload.x || 0} ${cmd.payload.y || 0}`;
       case "removeTemporarySprites":
         return "removeTemporarySprites";
       case "changeToTemporaryMap":
@@ -205,13 +217,15 @@ export default function App() {
           cmd.payload.clamp ? "true" : "false"
         }`;
       case "changeMapTile":
-        return `changeMapTile ${cmd.payload.layer} ${cmd.payload.x} ${cmd.payload.y} ${cmd.payload.tileIndex}`;
+        return `changeMapTile ${cmd.payload.layer} ${cmd.payload.x || 0} ${
+          cmd.payload.y || 0
+        } ${cmd.payload.tileIndex || 0}`;
       case "friendship":
-        return `friendship ${cmd.payload.actor} ${cmd.payload.amount}`;
+        return `friendship ${cmd.payload.actor} ${cmd.payload.amount || 0}`;
       case "addItem":
-        return `addItem ${cmd.payload.itemId} ${cmd.payload.count}`;
+        return `addItem ${cmd.payload.itemId || "0"} ${cmd.payload.count || 1}`;
       case "money":
-        return `money ${cmd.payload.amount}`;
+        return `money ${cmd.payload.amount || 0}`;
       case "mail":
         return `mail ${cmd.payload.letterId}`;
       case "mailReceived":
@@ -259,10 +273,12 @@ export default function App() {
         const prefix = cond.negated ? "!" : "";
         switch (cond.type) {
           case "Time":
-            return `${prefix}Time ${cond.payload.min} ${cond.payload.max}`;
+            return `${prefix}Time ${cond.payload.min || 0} ${
+              cond.payload.max || 0
+            }`;
           case "Friendship":
             return `${prefix}Friendship ${cond.payload.actor} ${
-              cond.payload.hearts * 250
+              (Number(cond.payload.hearts) || 0) * 250
             }`;
           case "Season":
             return `${prefix}Season ${cond.payload.season}`;
@@ -280,9 +296,12 @@ export default function App() {
     let key = `${eventId}`;
     if (conditionsString !== "") key += `/${conditionsString}`;
 
-    let val = `${music}/${viewport.x} ${viewport.y}/`;
+    let val = `${music}/${viewport.x || 0} ${viewport.y || 0}/`;
     const castString = cast
-      .map((actor) => `${actor.name} ${actor.x} ${actor.y} ${actor.facing}`)
+      .map(
+        (actor) =>
+          `${actor.name} ${actor.x || 0} ${actor.y || 0} ${actor.facing}`
+      )
       .join(" ");
     val += `${castString}/`;
 
@@ -1272,18 +1291,18 @@ export default function App() {
     }
     if (cmd.type === "move") {
       const moves = cmd.payload.movements
-        .map(
-          (m: any) =>
-            `${m.actor} moves ${
-              m.x !== 0
-                ? `${Math.abs(m.x)} spaces ${m.x > 0 ? "Right" : "Left"}`
-                : ""
-            }${m.x !== 0 && m.y !== 0 ? " and " : ""}${
-              m.y !== 0
-                ? `${Math.abs(m.y)} spaces ${m.y > 0 ? "Down" : "Up"}`
-                : ""
-            }`
-        )
+        .map((m: any) => {
+          const nx = Number(m.x) || 0;
+          const ny = Number(m.y) || 0;
+          const xStr =
+            nx !== 0
+              ? `${Math.abs(nx)} spaces ${nx > 0 ? "Right" : "Left"}`
+              : "";
+          const yStr =
+            ny !== 0 ? `${Math.abs(ny)} spaces ${ny > 0 ? "Down" : "Up"}` : "";
+          const joinStr = nx !== 0 && ny !== 0 ? " and " : "";
+          return `${m.actor} moves ${xStr}${joinStr}${yStr}`;
+        })
         .join(", ");
       return (
         <p
@@ -1300,7 +1319,8 @@ export default function App() {
           key={cmd.id}
           className="mb-2 text-sm italic text-slate-500 dark:text-slate-400"
         >
-          [{cmd.payload.actor} turns to face {getDir(cmd.payload.facing)}]
+          [{cmd.payload.actor} turns to face{" "}
+          {getDir(Number(cmd.payload.facing))}]
         </p>
       );
     }
@@ -1557,21 +1577,17 @@ export default function App() {
           <div className="flex items-center gap-2">
             <span>Between</span>
             <input
-              type="number"
+              type="text"
               className="border border-slate-300 dark:border-slate-600 dark:bg-slate-800 dark:text-white p-1 w-20 rounded"
               value={cond.payload.min}
-              onChange={(e) =>
-                updateCondition(cond.id, "min", Number(e.target.value))
-              }
+              onChange={(e) => updateCondition(cond.id, "min", e.target.value)}
             />
             <span>and</span>
             <input
-              type="number"
+              type="text"
               className="border border-slate-300 dark:border-slate-600 dark:bg-slate-800 dark:text-white p-1 w-20 rounded"
               value={cond.payload.max}
-              onChange={(e) =>
-                updateCondition(cond.id, "max", Number(e.target.value))
-              }
+              onChange={(e) => updateCondition(cond.id, "max", e.target.value)}
             />
           </div>
         );
@@ -1597,13 +1613,11 @@ export default function App() {
             </select>
             <span>Needs</span>
             <input
-              type="number"
-              min="1"
-              max="14"
+              type="text"
               className="border border-slate-300 dark:border-slate-600 dark:bg-slate-800 dark:text-white p-1 w-16 rounded"
               value={cond.payload.hearts}
               onChange={(e) =>
-                updateCondition(cond.id, "hearts", Number(e.target.value))
+                updateCondition(cond.id, "hearts", e.target.value)
               }
             />
             <span>Hearts</span>
@@ -1823,12 +1837,12 @@ export default function App() {
                 </select>
                 <span>X Offset:</span>
                 <input
-                  type="number"
+                  type="text"
                   className="border border-slate-300 dark:border-slate-600 dark:bg-slate-800 dark:text-white p-1 w-16 rounded"
                   value={m.x}
                   onChange={(e) => {
                     const newMv = [...cmd.payload.movements];
-                    newMv[mIndex].x = Number(e.target.value);
+                    newMv[mIndex].x = e.target.value;
                     isNested
                       ? updateNestedCommand(
                           parentCmdId!,
@@ -1842,12 +1856,12 @@ export default function App() {
                 />
                 <span>Y Offset:</span>
                 <input
-                  type="number"
+                  type="text"
                   className="border border-slate-300 dark:border-slate-600 dark:bg-slate-800 dark:text-white p-1 w-16 rounded"
                   value={m.y}
                   onChange={(e) => {
                     const newMv = [...cmd.payload.movements];
-                    newMv[mIndex].y = Number(e.target.value);
+                    newMv[mIndex].y = e.target.value;
                     isNested
                       ? updateNestedCommand(
                           parentCmdId!,
@@ -1958,7 +1972,7 @@ export default function App() {
           <div className="flex flex-wrap items-center gap-2 mt-2">
             <span>Pan X:</span>
             <input
-              type="number"
+              type="text"
               className="border border-slate-300 dark:border-slate-600 dark:bg-slate-800 dark:text-white p-1 w-16 rounded"
               value={cmd.payload.x}
               onChange={(e) =>
@@ -1968,14 +1982,14 @@ export default function App() {
                       parentOptionId!,
                       cmd.id,
                       "x",
-                      Number(e.target.value)
+                      e.target.value
                     )
-                  : updateCommand(cmd.id, "x", Number(e.target.value))
+                  : updateCommand(cmd.id, "x", e.target.value)
               }
             />
             <span>Pan Y:</span>
             <input
-              type="number"
+              type="text"
               className="border border-slate-300 dark:border-slate-600 dark:bg-slate-800 dark:text-white p-1 w-16 rounded"
               value={cmd.payload.y}
               onChange={(e) =>
@@ -1985,14 +1999,14 @@ export default function App() {
                       parentOptionId!,
                       cmd.id,
                       "y",
-                      Number(e.target.value)
+                      e.target.value
                     )
-                  : updateCommand(cmd.id, "y", Number(e.target.value))
+                  : updateCommand(cmd.id, "y", e.target.value)
               }
             />
             <span>Time (ms):</span>
             <input
-              type="number"
+              type="text"
               className="border border-slate-300 dark:border-slate-600 dark:bg-slate-800 dark:text-white p-1 w-20 rounded"
               value={cmd.payload.duration}
               onChange={(e) =>
@@ -2002,9 +2016,9 @@ export default function App() {
                       parentOptionId!,
                       cmd.id,
                       "duration",
-                      Number(e.target.value)
+                      e.target.value
                     )
-                  : updateCommand(cmd.id, "duration", Number(e.target.value))
+                  : updateCommand(cmd.id, "duration", e.target.value)
               }
             />
           </div>
@@ -2014,7 +2028,7 @@ export default function App() {
           <div className="flex items-center gap-2 mt-2">
             <span>Duration (ms):</span>
             <input
-              type="number"
+              type="text"
               className="border border-slate-300 dark:border-slate-600 dark:bg-slate-800 dark:text-white p-1 w-24 rounded"
               value={cmd.payload.duration}
               onChange={(e) =>
@@ -2024,9 +2038,9 @@ export default function App() {
                       parentOptionId!,
                       cmd.id,
                       "duration",
-                      Number(e.target.value)
+                      e.target.value
                     )
-                  : updateCommand(cmd.id, "duration", Number(e.target.value))
+                  : updateCommand(cmd.id, "duration", e.target.value)
               }
             />
           </div>
@@ -2113,7 +2127,7 @@ export default function App() {
             <span>Actor:</span> {actorDropdown}
             <span>X:</span>
             <input
-              type="number"
+              type="text"
               className="border border-slate-300 dark:border-slate-600 dark:bg-slate-800 dark:text-white p-1 w-16 rounded"
               value={cmd.payload.x}
               onChange={(e) =>
@@ -2123,14 +2137,14 @@ export default function App() {
                       parentOptionId!,
                       cmd.id,
                       "x",
-                      Number(e.target.value)
+                      e.target.value
                     )
-                  : updateCommand(cmd.id, "x", Number(e.target.value))
+                  : updateCommand(cmd.id, "x", e.target.value)
               }
             />
             <span>Y:</span>
             <input
-              type="number"
+              type="text"
               className="border border-slate-300 dark:border-slate-600 dark:bg-slate-800 dark:text-white p-1 w-16 rounded"
               value={cmd.payload.y}
               onChange={(e) =>
@@ -2140,9 +2154,9 @@ export default function App() {
                       parentOptionId!,
                       cmd.id,
                       "y",
-                      Number(e.target.value)
+                      e.target.value
                     )
-                  : updateCommand(cmd.id, "y", Number(e.target.value))
+                  : updateCommand(cmd.id, "y", e.target.value)
               }
             />
           </div>
@@ -2153,7 +2167,7 @@ export default function App() {
             <span>Actor:</span> {actorDropdown}
             <span>Duration (ms):</span>
             <input
-              type="number"
+              type="text"
               className="border border-slate-300 dark:border-slate-600 dark:bg-slate-800 dark:text-white p-1 w-20 rounded"
               value={cmd.payload.duration}
               onChange={(e) =>
@@ -2163,9 +2177,9 @@ export default function App() {
                       parentOptionId!,
                       cmd.id,
                       "duration",
-                      Number(e.target.value)
+                      e.target.value
                     )
-                  : updateCommand(cmd.id, "duration", Number(e.target.value))
+                  : updateCommand(cmd.id, "duration", e.target.value)
               }
             />
           </div>
@@ -2213,7 +2227,7 @@ export default function App() {
             <div className="flex flex-wrap items-center gap-2">
               <span>X:</span>
               <input
-                type="number"
+                type="text"
                 className="border border-slate-300 dark:border-slate-600 dark:bg-slate-800 dark:text-white p-1 w-16 rounded"
                 value={cmd.payload.x}
                 onChange={(e) =>
@@ -2223,14 +2237,14 @@ export default function App() {
                         parentOptionId!,
                         cmd.id,
                         "x",
-                        Number(e.target.value)
+                        e.target.value
                       )
-                    : updateCommand(cmd.id, "x", Number(e.target.value))
+                    : updateCommand(cmd.id, "x", e.target.value)
                 }
               />
               <span>Y:</span>
               <input
-                type="number"
+                type="text"
                 className="border border-slate-300 dark:border-slate-600 dark:bg-slate-800 dark:text-white p-1 w-16 rounded"
                 value={cmd.payload.y}
                 onChange={(e) =>
@@ -2240,9 +2254,9 @@ export default function App() {
                         parentOptionId!,
                         cmd.id,
                         "y",
-                        Number(e.target.value)
+                        e.target.value
                       )
-                    : updateCommand(cmd.id, "y", Number(e.target.value))
+                    : updateCommand(cmd.id, "y", e.target.value)
                 }
               />
               <span>Facing:</span> {facingDropdown}
@@ -2250,7 +2264,7 @@ export default function App() {
             <div className="flex flex-wrap items-center gap-2">
               <span>W:</span>
               <input
-                type="number"
+                type="text"
                 className="border border-slate-300 dark:border-slate-600 dark:bg-slate-800 dark:text-white p-1 w-16 rounded"
                 value={cmd.payload.w}
                 onChange={(e) =>
@@ -2260,14 +2274,14 @@ export default function App() {
                         parentOptionId!,
                         cmd.id,
                         "w",
-                        Number(e.target.value)
+                        e.target.value
                       )
-                    : updateCommand(cmd.id, "w", Number(e.target.value))
+                    : updateCommand(cmd.id, "w", e.target.value)
                 }
               />
               <span>H:</span>
               <input
-                type="number"
+                type="text"
                 className="border border-slate-300 dark:border-slate-600 dark:bg-slate-800 dark:text-white p-1 w-16 rounded"
                 value={cmd.payload.h}
                 onChange={(e) =>
@@ -2277,9 +2291,9 @@ export default function App() {
                         parentOptionId!,
                         cmd.id,
                         "h",
-                        Number(e.target.value)
+                        e.target.value
                       )
-                    : updateCommand(cmd.id, "h", Number(e.target.value))
+                    : updateCommand(cmd.id, "h", e.target.value)
                 }
               />
             </div>
@@ -2308,7 +2322,7 @@ export default function App() {
             />
             <span>X:</span>
             <input
-              type="number"
+              type="text"
               className="border border-slate-300 dark:border-slate-600 dark:bg-slate-800 dark:text-white p-1 w-16 rounded"
               value={cmd.payload.x}
               onChange={(e) =>
@@ -2318,14 +2332,14 @@ export default function App() {
                       parentOptionId!,
                       cmd.id,
                       "x",
-                      Number(e.target.value)
+                      e.target.value
                     )
-                  : updateCommand(cmd.id, "x", Number(e.target.value))
+                  : updateCommand(cmd.id, "x", e.target.value)
               }
             />
             <span>Y:</span>
             <input
-              type="number"
+              type="text"
               className="border border-slate-300 dark:border-slate-600 dark:bg-slate-800 dark:text-white p-1 w-16 rounded"
               value={cmd.payload.y}
               onChange={(e) =>
@@ -2335,9 +2349,9 @@ export default function App() {
                       parentOptionId!,
                       cmd.id,
                       "y",
-                      Number(e.target.value)
+                      e.target.value
                     )
-                  : updateCommand(cmd.id, "y", Number(e.target.value))
+                  : updateCommand(cmd.id, "y", e.target.value)
               }
             />
           </div>
@@ -2347,7 +2361,7 @@ export default function App() {
           <div className="flex flex-wrap items-center gap-2 mt-2">
             <span>Tile X:</span>
             <input
-              type="number"
+              type="text"
               className="border border-slate-300 dark:border-slate-600 dark:bg-slate-800 dark:text-white p-1 w-16 rounded"
               value={cmd.payload.x}
               onChange={(e) =>
@@ -2357,14 +2371,14 @@ export default function App() {
                       parentOptionId!,
                       cmd.id,
                       "x",
-                      Number(e.target.value)
+                      e.target.value
                     )
-                  : updateCommand(cmd.id, "x", Number(e.target.value))
+                  : updateCommand(cmd.id, "x", e.target.value)
               }
             />
             <span>Tile Y:</span>
             <input
-              type="number"
+              type="text"
               className="border border-slate-300 dark:border-slate-600 dark:bg-slate-800 dark:text-white p-1 w-16 rounded"
               value={cmd.payload.y}
               onChange={(e) =>
@@ -2374,9 +2388,9 @@ export default function App() {
                       parentOptionId!,
                       cmd.id,
                       "y",
-                      Number(e.target.value)
+                      e.target.value
                     )
-                  : updateCommand(cmd.id, "y", Number(e.target.value))
+                  : updateCommand(cmd.id, "y", e.target.value)
               }
             />
           </div>
@@ -2450,7 +2464,7 @@ export default function App() {
             />
             <span>X:</span>
             <input
-              type="number"
+              type="text"
               className="border border-slate-300 dark:border-slate-600 dark:bg-slate-800 dark:text-white p-1 w-16 rounded"
               value={cmd.payload.x}
               onChange={(e) =>
@@ -2460,14 +2474,14 @@ export default function App() {
                       parentOptionId!,
                       cmd.id,
                       "x",
-                      Number(e.target.value)
+                      e.target.value
                     )
-                  : updateCommand(cmd.id, "x", Number(e.target.value))
+                  : updateCommand(cmd.id, "x", e.target.value)
               }
             />
             <span>Y:</span>
             <input
-              type="number"
+              type="text"
               className="border border-slate-300 dark:border-slate-600 dark:bg-slate-800 dark:text-white p-1 w-16 rounded"
               value={cmd.payload.y}
               onChange={(e) =>
@@ -2477,14 +2491,14 @@ export default function App() {
                       parentOptionId!,
                       cmd.id,
                       "y",
-                      Number(e.target.value)
+                      e.target.value
                     )
-                  : updateCommand(cmd.id, "y", Number(e.target.value))
+                  : updateCommand(cmd.id, "y", e.target.value)
               }
             />
             <span>Tile Index:</span>
             <input
-              type="number"
+              type="text"
               className="border border-slate-300 dark:border-slate-600 dark:bg-slate-800 dark:text-white p-1 w-20 rounded"
               value={cmd.payload.tileIndex}
               onChange={(e) =>
@@ -2494,9 +2508,9 @@ export default function App() {
                       parentOptionId!,
                       cmd.id,
                       "tileIndex",
-                      Number(e.target.value)
+                      e.target.value
                     )
-                  : updateCommand(cmd.id, "tileIndex", Number(e.target.value))
+                  : updateCommand(cmd.id, "tileIndex", e.target.value)
               }
             />
           </div>
@@ -2507,7 +2521,7 @@ export default function App() {
             <span>Actor:</span> {actorDropdown}
             <span>Amount:</span>
             <input
-              type="number"
+              type="text"
               className="border border-slate-300 dark:border-slate-600 dark:bg-slate-800 dark:text-white p-1 w-24 rounded"
               value={cmd.payload.amount}
               onChange={(e) =>
@@ -2517,9 +2531,9 @@ export default function App() {
                       parentOptionId!,
                       cmd.id,
                       "amount",
-                      Number(e.target.value)
+                      e.target.value
                     )
-                  : updateCommand(cmd.id, "amount", Number(e.target.value))
+                  : updateCommand(cmd.id, "amount", e.target.value)
               }
             />
           </div>
@@ -2546,7 +2560,7 @@ export default function App() {
             />
             <span>Count:</span>
             <input
-              type="number"
+              type="text"
               className="border border-slate-300 dark:border-slate-600 dark:bg-slate-800 dark:text-white p-1 w-16 rounded"
               value={cmd.payload.count}
               onChange={(e) =>
@@ -2556,9 +2570,9 @@ export default function App() {
                       parentOptionId!,
                       cmd.id,
                       "count",
-                      Number(e.target.value)
+                      e.target.value
                     )
-                  : updateCommand(cmd.id, "count", Number(e.target.value))
+                  : updateCommand(cmd.id, "count", e.target.value)
               }
             />
           </div>
@@ -2568,7 +2582,7 @@ export default function App() {
           <div className="flex items-center gap-2 mt-2">
             <span>Amount:</span>
             <input
-              type="number"
+              type="text"
               className="border border-slate-300 dark:border-slate-600 dark:bg-slate-800 dark:text-white p-1 w-32 rounded"
               value={cmd.payload.amount}
               onChange={(e) =>
@@ -2578,9 +2592,9 @@ export default function App() {
                       parentOptionId!,
                       cmd.id,
                       "amount",
-                      Number(e.target.value)
+                      e.target.value
                     )
-                  : updateCommand(cmd.id, "amount", Number(e.target.value))
+                  : updateCommand(cmd.id, "amount", e.target.value)
               }
             />
           </div>
@@ -3441,11 +3455,11 @@ export default function App() {
                   Camera X
                 </label>
                 <input
-                  type="number"
+                  type="text"
                   className="w-full border border-slate-300 dark:border-slate-600 p-2 rounded bg-slate-50 dark:bg-slate-800 dark:text-white"
                   value={viewport.x}
                   onChange={(e) =>
-                    setViewport({ ...viewport, x: Number(e.target.value) })
+                    setViewport({ ...viewport, x: e.target.value })
                   }
                 />
               </div>
@@ -3454,11 +3468,11 @@ export default function App() {
                   Camera Y
                 </label>
                 <input
-                  type="number"
+                  type="text"
                   className="w-full border border-slate-300 dark:border-slate-600 p-2 rounded bg-slate-50 dark:bg-slate-800 dark:text-white"
                   value={viewport.y}
                   onChange={(e) =>
-                    setViewport({ ...viewport, y: Number(e.target.value) })
+                    setViewport({ ...viewport, y: e.target.value })
                   }
                 />
               </div>
@@ -3484,20 +3498,20 @@ export default function App() {
                 />
                 <span className="text-slate-400 text-sm">X:</span>
                 <input
-                  type="number"
+                  type="text"
                   className="border border-slate-300 dark:border-slate-600 dark:bg-slate-800 dark:text-white p-2 w-16 rounded"
                   value={actor.x}
                   onChange={(e) =>
-                    updateCastMember(actor.id, "x", Number(e.target.value))
+                    updateCastMember(actor.id, "x", e.target.value)
                   }
                 />
                 <span className="text-slate-400 text-sm">Y:</span>
                 <input
-                  type="number"
+                  type="text"
                   className="border border-slate-300 dark:border-slate-600 dark:bg-slate-800 dark:text-white p-2 w-16 rounded"
                   value={actor.y}
                   onChange={(e) =>
-                    updateCastMember(actor.id, "y", Number(e.target.value))
+                    updateCastMember(actor.id, "y", e.target.value)
                   }
                 />
                 <select
