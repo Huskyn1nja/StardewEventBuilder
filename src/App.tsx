@@ -46,7 +46,36 @@ export default function App() {
 
   const [isMenuOpen, setIsMenuOpen] = useState<boolean>(false);
   const [showImport, setShowImport] = useState<boolean>(false);
+  const [showScriptPreview, setShowScriptPreview] = useState<boolean>(false);
   const [importText, setImportText] = useState<string>("");
+  const [i18nText, setI18nText] = useState<string>("");
+  const [i18nData, setI18nData] = useState<Record<string, string>>({});
+
+  const [savedLocations, setSavedLocations] = useState<string[]>(() => {
+    const saved = localStorage.getItem("savedLocations");
+    return saved !== null
+      ? JSON.parse(saved)
+      : ["Railroad", "Town", "Farm", "Saloon", "Mountain"];
+  });
+
+  const [savedActors, setSavedActors] = useState<string[]>(() => {
+    const saved = localStorage.getItem("savedActors");
+    return saved !== null
+      ? JSON.parse(saved)
+      : [
+          "farmer",
+          "Abigail",
+          "Penny",
+          "Sebastian",
+          "Haley",
+          "Alex",
+          "Sam",
+          "Harvey",
+          "Elliott",
+          "Leah",
+          "Maru",
+        ];
+  });
 
   const [exportAsCP, setExportAsCP] = useState<boolean>(() => {
     const saved = localStorage.getItem("defaultExportAsCP");
@@ -95,6 +124,25 @@ export default function App() {
       localStorage.setItem("darkMode", "false");
     }
   }, [isDarkMode]);
+
+  useEffect(() => {
+    if (location && !savedLocations.includes(location)) {
+      const newLocs = Array.from(new Set([...savedLocations, location]));
+      setSavedLocations(newLocs);
+      localStorage.setItem("savedLocations", JSON.stringify(newLocs));
+    }
+  }, [location, savedLocations]);
+
+  useEffect(() => {
+    const newActors = cast
+      .map((c) => c.name)
+      .filter((name) => !savedActors.includes(name));
+    if (newActors.length > 0) {
+      const mergedActors = Array.from(new Set([...savedActors, ...newActors]));
+      setSavedActors(mergedActors);
+      localStorage.setItem("savedActors", JSON.stringify(mergedActors));
+    }
+  }, [cast, savedActors]);
 
   useEffect(() => {
     compileEvent();
@@ -152,6 +200,12 @@ export default function App() {
         return `removeObject ${cmd.payload.x} ${cmd.payload.y}`;
       case "removeTemporarySprites":
         return "removeTemporarySprites";
+      case "changeToTemporaryMap":
+        return `changeToTemporaryMap ${cmd.payload.map} ${
+          cmd.payload.clamp ? "true" : "false"
+        }`;
+      case "changeMapTile":
+        return `changeMapTile ${cmd.payload.layer} ${cmd.payload.x} ${cmd.payload.y} ${cmd.payload.tileIndex}`;
       case "friendship":
         return `friendship ${cmd.payload.actor} ${cmd.payload.amount}`;
       case "addItem":
@@ -341,6 +395,25 @@ export default function App() {
       };
     } else if (cmdStr === "removeTemporarySprites") {
       return { id: ts, type: "removeTemporarySprites", payload: {} };
+    } else if (cmdStr.startsWith("changeToTemporaryMap ")) {
+      const parts = cmdStr.split(" ");
+      return {
+        id: ts,
+        type: "changeToTemporaryMap",
+        payload: { map: parts[1] || "", clamp: parts[2] !== "false" },
+      };
+    } else if (cmdStr.startsWith("changeMapTile ")) {
+      const parts = cmdStr.split(" ");
+      return {
+        id: ts,
+        type: "changeMapTile",
+        payload: {
+          layer: parts[1] || "Buildings",
+          x: parseInt(parts[2]) || 0,
+          y: parseInt(parts[3]) || 0,
+          tileIndex: parseInt(parts[4]) || 0,
+        },
+      };
     } else if (cmdStr.startsWith("mail ")) {
       const parts = cmdStr.split(" ");
       return { id: ts, type: "mail", payload: { letterId: parts[1] || "" } };
@@ -514,16 +587,20 @@ export default function App() {
         rawText = rawText.slice(1, -1).trim();
       }
 
-      const parts = rawText.split('": "');
+      const parts = rawText.split(/":\s*"/);
       if (parts.length < 2) {
         alert(
-          'Invalid format! Please paste a full line like: "EventID/Time 600": "music/viewport/cast/commands..."'
+          'Invalid format! Please paste a single full event line like: "EventID/Time 600": "music/viewport/cast/commands..."'
         );
         return;
       }
 
       let rawKey = parts[0].replace(/^"/, "").trim();
-      let rawScript = parts[1].replace(/,$/, "").replace(/"$/, "").trim();
+      let rawScript = parts[1]
+        .replace(/,$/, "")
+        .replace(/"$/, "")
+        .replace(/[\n\r\t]/g, "")
+        .trim();
 
       const keyTokens = rawKey.split("/");
       setEventId(keyTokens[0] || "Imported_Event");
@@ -651,6 +728,10 @@ export default function App() {
         setShowImport(false);
         setImportText("");
         alert("Event successfully imported!");
+      } else {
+        alert(
+          "Parsed successfully, but it appears to be a sub-event missing the music/viewport/cast headers. Timeline actions may be slightly scrambled."
+        );
       }
     } catch (error) {
       console.error(error);
@@ -658,6 +739,22 @@ export default function App() {
         "Failed to parse event. Make sure it matches the exact Stardew Valley JSON format."
       );
     }
+  };
+
+  const handleParseI18n = () => {
+    try {
+      const parsed = JSON.parse(i18nText);
+      setI18nData(parsed);
+    } catch (e) {
+      alert("Invalid JSON format for i18n data.");
+    }
+  };
+
+  const replaceI18n = (str: string) => {
+    if (!str) return "";
+    return str.replace(/\{\{i18n:([\w\.]+)\}\}/gi, (match, key) => {
+      return i18nData[key.trim()] || match;
+    });
   };
 
   const handleReset = () => {
@@ -806,6 +903,10 @@ export default function App() {
         return { x: 0, y: 0 };
       case "removeTemporarySprites":
         return {};
+      case "changeToTemporaryMap":
+        return { map: "", clamp: true };
+      case "changeMapTile":
+        return { layer: "Buildings", x: 0, y: 0, tileIndex: 0 };
       case "friendship":
         return { actor: defaultActor, amount: 250 };
       case "addItem":
@@ -1083,6 +1184,370 @@ export default function App() {
   const copyToClipboard = () => {
     navigator.clipboard.writeText(outputString);
     alert("Event copied to clipboard!");
+  };
+
+  const renderScriptLine = (cmd: Command) => {
+    const getDir = (d: number) =>
+      ["Up", "Right", "Down", "Left"][d] || d.toString();
+
+    if (cmd.type === "speak") {
+      return (
+        <p key={cmd.id} className="mb-2">
+          <strong className="text-emerald-700 dark:text-emerald-400">
+            {cmd.payload.actor}:
+          </strong>{" "}
+          {replaceI18n(cmd.payload.text)}
+        </p>
+      );
+    }
+    if (cmd.type === "message") {
+      return (
+        <p
+          key={cmd.id}
+          className="mb-2 italic text-slate-700 dark:text-slate-300"
+        >
+          {replaceI18n(cmd.payload.text)}
+        </p>
+      );
+    }
+    if (cmd.type === "textAboveHead") {
+      return (
+        <p
+          key={cmd.id}
+          className="mb-2 text-sm text-slate-500 dark:text-slate-400"
+        >
+          ({cmd.payload.actor} thinks: {replaceI18n(cmd.payload.text)})
+        </p>
+      );
+    }
+    if (cmd.type === "question") {
+      return (
+        <div
+          key={cmd.id}
+          className="mb-2 p-2 border border-slate-300 dark:border-slate-700 rounded bg-slate-50 dark:bg-slate-800"
+        >
+          <p className="font-bold mb-1">
+            [Player Choice]: {replaceI18n(cmd.payload.prompt)}
+          </p>
+          <ul className="list-disc list-inside pl-4 text-sm text-slate-600 dark:text-slate-400">
+            {cmd.payload.options.map((opt: string, i: number) => (
+              <li key={i}>{replaceI18n(opt)}</li>
+            ))}
+          </ul>
+        </div>
+      );
+    }
+    if (cmd.type === "quickQuestion") {
+      return (
+        <div
+          key={cmd.id}
+          className="mb-4 p-3 border-2 border-indigo-200 dark:border-indigo-900 rounded bg-indigo-50 dark:bg-indigo-950/20"
+        >
+          <p className="font-bold text-indigo-700 dark:text-indigo-400 mb-2">
+            [Branching Choice]: {replaceI18n(cmd.payload.prompt)}
+          </p>
+          {cmd.payload.options.map((opt: QuestionOption) => (
+            <div
+              key={opt.id}
+              className="ml-4 pl-4 border-l-2 border-indigo-300 dark:border-indigo-700 mb-3"
+            >
+              <p className="font-bold text-sm text-indigo-600 dark:text-indigo-500 mb-1">
+                If player selects: {replaceI18n(opt.label)}
+              </p>
+              {opt.commands.map(renderScriptLine)}
+            </div>
+          ))}
+        </div>
+      );
+    }
+    if (cmd.type === "emote") {
+      return (
+        <p
+          key={cmd.id}
+          className="mb-2 text-sm italic text-slate-500 dark:text-slate-400"
+        >
+          [{cmd.payload.actor} emotes #{cmd.payload.emoteId}]
+        </p>
+      );
+    }
+    if (cmd.type === "move") {
+      const moves = cmd.payload.movements
+        .map(
+          (m: any) =>
+            `${m.actor} moves ${
+              m.x !== 0
+                ? `${Math.abs(m.x)} spaces ${m.x > 0 ? "Right" : "Left"}`
+                : ""
+            }${m.x !== 0 && m.y !== 0 ? " and " : ""}${
+              m.y !== 0
+                ? `${Math.abs(m.y)} spaces ${m.y > 0 ? "Down" : "Up"}`
+                : ""
+            }`
+        )
+        .join(", ");
+      return (
+        <p
+          key={cmd.id}
+          className="mb-2 text-sm italic text-slate-500 dark:text-slate-400"
+        >
+          [{moves}]
+        </p>
+      );
+    }
+    if (cmd.type === "faceDirection") {
+      return (
+        <p
+          key={cmd.id}
+          className="mb-2 text-sm italic text-slate-500 dark:text-slate-400"
+        >
+          [{cmd.payload.actor} turns to face {getDir(cmd.payload.facing)}]
+        </p>
+      );
+    }
+    if (cmd.type === "pause") {
+      return (
+        <p
+          key={cmd.id}
+          className="mb-2 text-sm italic text-slate-500 dark:text-slate-400"
+        >
+          [Pause for {cmd.payload.duration}ms]
+        </p>
+      );
+    }
+    if (cmd.type === "warp") {
+      return (
+        <p
+          key={cmd.id}
+          className="mb-2 text-sm italic text-slate-500 dark:text-slate-400"
+        >
+          [{cmd.payload.actor} teleports to {cmd.payload.x}, {cmd.payload.y}]
+        </p>
+      );
+    }
+    if (cmd.type === "shake") {
+      return (
+        <p
+          key={cmd.id}
+          className="mb-2 text-sm italic text-slate-500 dark:text-slate-400"
+        >
+          [{cmd.payload.actor} shakes for {cmd.payload.duration}ms]
+        </p>
+      );
+    }
+    if (cmd.type === "globalFade") {
+      return (
+        <p
+          key={cmd.id}
+          className="mb-2 text-sm italic text-slate-500 dark:text-slate-400"
+        >
+          [Screen fades to black]
+        </p>
+      );
+    }
+    if (cmd.type === "viewportMove") {
+      return (
+        <p
+          key={cmd.id}
+          className="mb-2 text-sm italic text-slate-500 dark:text-slate-400"
+        >
+          [Camera pans by {cmd.payload.x}, {cmd.payload.y}]
+        </p>
+      );
+    }
+    if (cmd.type === "playMusic") {
+      return (
+        <p
+          key={cmd.id}
+          className="mb-2 text-sm italic text-slate-500 dark:text-slate-400"
+        >
+          [Music plays: {cmd.payload.trackId}]
+        </p>
+      );
+    }
+    if (cmd.type === "stopMusic") {
+      return (
+        <p
+          key={cmd.id}
+          className="mb-2 text-sm italic text-slate-500 dark:text-slate-400"
+        >
+          [Music stops]
+        </p>
+      );
+    }
+    if (cmd.type === "playSound") {
+      return (
+        <p
+          key={cmd.id}
+          className="mb-2 text-sm italic text-slate-500 dark:text-slate-400"
+        >
+          [Sound effect: {cmd.payload.soundId}]
+        </p>
+      );
+    }
+    if (cmd.type === "stopSound") {
+      return (
+        <p
+          key={cmd.id}
+          className="mb-2 text-sm italic text-slate-500 dark:text-slate-400"
+        >
+          [Sound effect stops: {cmd.payload.soundId}]
+        </p>
+      );
+    }
+    if (cmd.type === "addTemporaryActor") {
+      return (
+        <p
+          key={cmd.id}
+          className="mb-2 text-sm italic text-slate-500 dark:text-slate-400"
+        >
+          [{cmd.payload.name} enters the scene at {cmd.payload.x},{" "}
+          {cmd.payload.y}]
+        </p>
+      );
+    }
+    if (cmd.type === "addObject") {
+      return (
+        <p
+          key={cmd.id}
+          className="mb-2 text-sm italic text-slate-500 dark:text-slate-400"
+        >
+          [Object {cmd.payload.itemId} appears at {cmd.payload.x},{" "}
+          {cmd.payload.y}]
+        </p>
+      );
+    }
+    if (cmd.type === "addBigProp") {
+      return (
+        <p
+          key={cmd.id}
+          className="mb-2 text-sm italic text-slate-500 dark:text-slate-400"
+        >
+          [Big Prop {cmd.payload.itemId} appears at {cmd.payload.x},{" "}
+          {cmd.payload.y}]
+        </p>
+      );
+    }
+    if (cmd.type === "removeObject") {
+      return (
+        <p
+          key={cmd.id}
+          className="mb-2 text-sm italic text-slate-500 dark:text-slate-400"
+        >
+          [Object removed at {cmd.payload.x}, {cmd.payload.y}]
+        </p>
+      );
+    }
+    if (cmd.type === "removeTemporarySprites") {
+      return (
+        <p
+          key={cmd.id}
+          className="mb-2 text-sm italic text-slate-500 dark:text-slate-400"
+        >
+          [All temporary sprites are cleared]
+        </p>
+      );
+    }
+    if (cmd.type === "changeToTemporaryMap") {
+      return (
+        <p
+          key={cmd.id}
+          className="mb-2 text-sm italic text-slate-500 dark:text-slate-400"
+        >
+          [Map changes to temporary map: {cmd.payload.map}]
+        </p>
+      );
+    }
+    if (cmd.type === "changeMapTile") {
+      return (
+        <p
+          key={cmd.id}
+          className="mb-2 text-sm italic text-slate-500 dark:text-slate-400"
+        >
+          [Tile at {cmd.payload.x}, {cmd.payload.y} on layer {cmd.payload.layer}{" "}
+          changes to index {cmd.payload.tileIndex}]
+        </p>
+      );
+    }
+    if (cmd.type === "friendship") {
+      return (
+        <p
+          key={cmd.id}
+          className="mb-2 text-sm italic text-amber-600 dark:text-amber-500"
+        >
+          [Reward: Friendship with {cmd.payload.actor} changes by{" "}
+          {cmd.payload.amount} points]
+        </p>
+      );
+    }
+    if (cmd.type === "addItem") {
+      return (
+        <p
+          key={cmd.id}
+          className="mb-2 text-sm italic text-amber-600 dark:text-amber-500"
+        >
+          [Reward: Received {cmd.payload.count}x Item {cmd.payload.itemId}]
+        </p>
+      );
+    }
+    if (cmd.type === "money") {
+      return (
+        <p
+          key={cmd.id}
+          className="mb-2 text-sm italic text-amber-600 dark:text-amber-500"
+        >
+          [Reward: Received {cmd.payload.amount}g]
+        </p>
+      );
+    }
+    if (cmd.type === "mail") {
+      return (
+        <p
+          key={cmd.id}
+          className="mb-2 text-sm italic text-slate-500 dark:text-slate-400"
+        >
+          [Mail queued for tomorrow: {cmd.payload.letterId}]
+        </p>
+      );
+    }
+    if (cmd.type === "mailReceived") {
+      return (
+        <p
+          key={cmd.id}
+          className="mb-2 text-sm italic text-slate-500 dark:text-slate-400"
+        >
+          [Mail flag {cmd.payload.add ? "added" : "removed"}:{" "}
+          {cmd.payload.letterId}]
+        </p>
+      );
+    }
+    if (cmd.type === "fork") {
+      return (
+        <p
+          key={cmd.id}
+          className="mb-2 text-sm italic font-bold text-indigo-600 dark:text-indigo-400"
+        >
+          [Event jumps to Fork: {cmd.payload.targetId}]
+        </p>
+      );
+    }
+    if (cmd.type === "end") {
+      return (
+        <p
+          key={cmd.id}
+          className="mb-2 text-sm italic font-bold text-slate-600 dark:text-slate-400"
+        >
+          [End Scene: {cmd.payload.style}]
+        </p>
+      );
+    }
+    return (
+      <p
+        key={cmd.id}
+        className="mb-2 text-sm italic text-slate-400 dark:text-slate-500"
+      >
+        [System Action: {cmd.type}]
+      </p>
+    );
   };
 
   const renderConditionInputs = (cond: Condition) => {
@@ -1712,6 +2177,7 @@ export default function App() {
               <span>Name/ID:</span>
               <input
                 type="text"
+                list="savedActorsList"
                 className="border border-slate-300 dark:border-slate-600 dark:bg-slate-800 dark:text-white p-1 w-24 rounded"
                 value={cmd.payload.name}
                 onChange={(e) =>
@@ -1919,6 +2385,120 @@ export default function App() {
         return (
           <div className="text-slate-600 dark:text-slate-400 italic mt-2">
             Clears all active temporary sprites.
+          </div>
+        );
+      case "changeToTemporaryMap":
+        return (
+          <div className="flex items-center gap-2 mt-2">
+            <span>Map Name:</span>
+            <input
+              type="text"
+              className="border border-slate-300 dark:border-slate-600 dark:bg-slate-800 dark:text-white p-1 rounded"
+              value={cmd.payload.map}
+              onChange={(e) =>
+                isNested
+                  ? updateNestedCommand(
+                      parentCmdId!,
+                      parentOptionId!,
+                      cmd.id,
+                      "map",
+                      e.target.value
+                    )
+                  : updateCommand(cmd.id, "map", e.target.value)
+              }
+            />
+            <label className="flex items-center gap-1 cursor-pointer">
+              <input
+                type="checkbox"
+                checked={cmd.payload.clamp}
+                onChange={(e) =>
+                  isNested
+                    ? updateNestedCommand(
+                        parentCmdId!,
+                        parentOptionId!,
+                        cmd.id,
+                        "clamp",
+                        e.target.checked
+                      )
+                    : updateCommand(cmd.id, "clamp", e.target.checked)
+                }
+                className="accent-emerald-500 rounded"
+              />
+              <span>Clamp Viewport</span>
+            </label>
+          </div>
+        );
+      case "changeMapTile":
+        return (
+          <div className="flex flex-wrap items-center gap-2 mt-2">
+            <span>Layer:</span>
+            <input
+              type="text"
+              className="border border-slate-300 dark:border-slate-600 dark:bg-slate-800 dark:text-white p-1 w-24 rounded"
+              value={cmd.payload.layer}
+              onChange={(e) =>
+                isNested
+                  ? updateNestedCommand(
+                      parentCmdId!,
+                      parentOptionId!,
+                      cmd.id,
+                      "layer",
+                      e.target.value
+                    )
+                  : updateCommand(cmd.id, "layer", e.target.value)
+              }
+            />
+            <span>X:</span>
+            <input
+              type="number"
+              className="border border-slate-300 dark:border-slate-600 dark:bg-slate-800 dark:text-white p-1 w-16 rounded"
+              value={cmd.payload.x}
+              onChange={(e) =>
+                isNested
+                  ? updateNestedCommand(
+                      parentCmdId!,
+                      parentOptionId!,
+                      cmd.id,
+                      "x",
+                      Number(e.target.value)
+                    )
+                  : updateCommand(cmd.id, "x", Number(e.target.value))
+              }
+            />
+            <span>Y:</span>
+            <input
+              type="number"
+              className="border border-slate-300 dark:border-slate-600 dark:bg-slate-800 dark:text-white p-1 w-16 rounded"
+              value={cmd.payload.y}
+              onChange={(e) =>
+                isNested
+                  ? updateNestedCommand(
+                      parentCmdId!,
+                      parentOptionId!,
+                      cmd.id,
+                      "y",
+                      Number(e.target.value)
+                    )
+                  : updateCommand(cmd.id, "y", Number(e.target.value))
+              }
+            />
+            <span>Tile Index:</span>
+            <input
+              type="number"
+              className="border border-slate-300 dark:border-slate-600 dark:bg-slate-800 dark:text-white p-1 w-20 rounded"
+              value={cmd.payload.tileIndex}
+              onChange={(e) =>
+                isNested
+                  ? updateNestedCommand(
+                      parentCmdId!,
+                      parentOptionId!,
+                      cmd.id,
+                      "tileIndex",
+                      Number(e.target.value)
+                    )
+                  : updateCommand(cmd.id, "tileIndex", Number(e.target.value))
+              }
+            />
           </div>
         );
       case "friendship":
@@ -2383,6 +2963,12 @@ export default function App() {
                               <option value="removeTemporarySprites">
                                 Clear Temp Sprites
                               </option>
+                              <option value="changeToTemporaryMap">
+                                Temp Map
+                              </option>
+                              <option value="changeMapTile">
+                                Change Map Tile
+                              </option>
                             </optgroup>
                             <optgroup label="Audio">
                               <option value="playSound">Play Sound</option>
@@ -2447,6 +3033,8 @@ export default function App() {
                           <option value="removeTemporarySprites">
                             Clear Temp Sprites
                           </option>
+                          <option value="changeToTemporaryMap">Temp Map</option>
+                          <option value="changeMapTile">Change Map Tile</option>
                         </optgroup>
                         <optgroup label="Audio">
                           <option value="playSound">Play Sound</option>
@@ -2558,6 +3146,60 @@ export default function App() {
 
   return (
     <div className="min-h-screen bg-slate-100 dark:bg-slate-950 p-8 pb-48 font-sans text-slate-800 dark:text-slate-200 transition-colors">
+      <datalist id="savedLocationsList">
+        {savedLocations.map((loc) => (
+          <option key={loc} value={loc} />
+        ))}
+      </datalist>
+
+      <datalist id="savedActorsList">
+        {savedActors.map((actor) => (
+          <option key={actor} value={actor} />
+        ))}
+      </datalist>
+
+      {showScriptPreview && (
+        <div className="fixed inset-0 bg-black/80 z-[100] flex items-center justify-center p-8">
+          <div className="bg-white dark:bg-slate-900 w-full max-w-6xl h-full rounded-xl flex flex-col md:flex-row overflow-hidden shadow-2xl">
+            <div className="w-full md:w-1/3 border-r border-slate-200 dark:border-slate-700 flex flex-col p-4">
+              <div className="flex justify-between items-center mb-4">
+                <h3 className="font-bold text-lg">i18n Parser</h3>
+                <button
+                  onClick={() => setShowScriptPreview(false)}
+                  className="text-red-500 font-bold hover:text-red-700"
+                >
+                  Close
+                </button>
+              </div>
+              <p className="text-sm text-slate-500 mb-2">
+                Paste your i18n JSON data here to replace keys in the script
+                view.
+              </p>
+              <textarea
+                className="flex-grow border border-slate-300 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 p-2 font-mono text-sm rounded mb-4"
+                placeholder='{&#10;  "EventKey.1": "Hello!"&#10;}'
+                value={i18nText}
+                onChange={(e) => setI18nText(e.target.value)}
+              />
+              <button
+                onClick={handleParseI18n}
+                className="bg-emerald-500 hover:bg-emerald-600 text-white font-bold py-2 px-4 rounded"
+              >
+                Apply Translation
+              </button>
+            </div>
+            <div className="w-full md:w-2/3 p-6 overflow-y-auto bg-slate-50 dark:bg-slate-950">
+              <h2 className="text-2xl font-bold text-slate-800 dark:text-slate-200 mb-6 pb-2 border-b border-slate-300 dark:border-slate-700">
+                Event Script Preview
+              </h2>
+              <div className="flex flex-col gap-1 text-lg">
+                {timeline.map(renderScriptLine)}
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
       <div className="max-w-4xl mx-auto bg-white dark:bg-slate-900 p-8 rounded-xl shadow-lg border border-slate-200 dark:border-slate-700 transition-colors">
         <div className="flex justify-between items-start mb-6">
           <div>
@@ -2607,6 +3249,15 @@ export default function App() {
                     className="px-4 py-3 text-left hover:bg-slate-100 dark:hover:bg-slate-700 text-emerald-600 dark:text-emerald-400 font-medium"
                   >
                     💾 Save Current as Default
+                  </button>
+                  <button
+                    onClick={() => {
+                      setShowScriptPreview(true);
+                      setIsMenuOpen(false);
+                    }}
+                    className="px-4 py-3 text-left hover:bg-slate-100 dark:hover:bg-slate-700 text-indigo-600 dark:text-indigo-400 font-medium"
+                  >
+                    📜 View Script Preview
                   </button>
                 </div>
               )}
@@ -2677,6 +3328,7 @@ export default function App() {
               </label>
               <input
                 type="text"
+                list="savedLocationsList"
                 className="w-full border border-slate-300 dark:border-slate-600 p-2 rounded bg-slate-50 dark:bg-slate-800 dark:text-white"
                 value={location}
                 onChange={(e) => setLocation(e.target.value)}
@@ -2821,6 +3473,7 @@ export default function App() {
               <div key={actor.id} className="flex gap-2 mb-2 items-center">
                 <input
                   type="text"
+                  list="savedActorsList"
                   className="border border-slate-300 dark:border-slate-600 dark:bg-slate-800 dark:text-white p-2 w-1/3 rounded"
                   placeholder="Actor Name"
                   value={actor.name}
@@ -2959,6 +3612,8 @@ export default function App() {
                       <option value="removeTemporarySprites">
                         Clear Temp Sprites
                       </option>
+                      <option value="changeToTemporaryMap">Temp Map</option>
+                      <option value="changeMapTile">Change Map Tile</option>
                     </optgroup>
                     <optgroup label="Audio">
                       <option value="playSound">Play Sound</option>
@@ -3102,6 +3757,22 @@ export default function App() {
                   className="bg-white dark:bg-slate-800 border border-cyan-500 text-cyan-700 dark:text-cyan-400 font-semibold px-3 py-1.5 rounded text-left hover:bg-cyan-50 dark:hover:bg-cyan-900/20 text-sm"
                 >
                   + Clear Sprites
+                </button>
+                <button
+                  onClick={() =>
+                    insertCommand("changeToTemporaryMap", timeline.length)
+                  }
+                  className="bg-white dark:bg-slate-800 border border-cyan-500 text-cyan-700 dark:text-cyan-400 font-semibold px-3 py-1.5 rounded text-left hover:bg-cyan-50 dark:hover:bg-cyan-900/20 text-sm"
+                >
+                  + Temp Map
+                </button>
+                <button
+                  onClick={() =>
+                    insertCommand("changeMapTile", timeline.length)
+                  }
+                  className="bg-white dark:bg-slate-800 border border-cyan-500 text-cyan-700 dark:text-cyan-400 font-semibold px-3 py-1.5 rounded text-left hover:bg-cyan-50 dark:hover:bg-cyan-900/20 text-sm"
+                >
+                  + Change Map Tile
                 </button>
               </div>
 
