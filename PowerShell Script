@@ -1,0 +1,18 @@
+This is a placeholder for the Windows Powershell Script to re-create the data for dictionary.ts
+
+To use: Unpack the game files, Open Windows Powershell, navigate to the folder where Objects.json is located.
+
+$json = Get-Content ".\Objects.json" -Raw | ConvertFrom-Json
+$output = @("export const STARDEW_DICTIONARY = [")
+
+foreach ($prop in $json.psobject.properties) {
+    $id = $prop.Name
+    $name = $prop.Value.Name -replace '"', '\"'
+    $type = $prop.Value.Type
+    $tags = if ($prop.Value.ContextTags) { ($prop.Value.ContextTags | ForEach-Object { "`"$_`"" }) -join ", " } else { "" }
+    
+    $output += "  { id: `"(O)$id`", name: `"$name`", type: `"$type`", tags: [$tags] },"
+}
+
+$output += "];"
+$output | Set-Content ".\dictionary.ts" -Encoding UTF8
