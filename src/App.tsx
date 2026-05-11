@@ -3358,7 +3358,7 @@ export default function App() {
       ...prev,
       { id: Date.now(), itemOrTag: id, dialogue: "" },
     ]);
-    setIsSearchOpen(false); // Close search when adding a specific dialogue box so they can type
+    setIsSearchOpen(false);
   };
 
   return (
