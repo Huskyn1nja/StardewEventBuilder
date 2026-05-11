@@ -183,10 +183,11 @@ export default function App() {
     if (!searchQuery) return [];
     const query = searchQuery.toLowerCase();
     return STARDEW_DICTIONARY.filter(
-      (item) =>
-        item.name.toLowerCase().includes(query) ||
-        item.id.toLowerCase().includes(query) ||
-        item.tags.some((tag) => tag.toLowerCase().includes(query))
+      (item: any) =>
+        item.name?.toLowerCase().includes(query) ||
+        item.id?.toLowerCase().includes(query) ||
+        item.category?.toLowerCase().includes(query) ||
+        item.tags?.some((tag: string) => tag?.toLowerCase().includes(query))
     );
   }, [searchQuery]);
 
@@ -3437,6 +3438,11 @@ export default function App() {
                           <span className="text-xs font-mono bg-slate-200 dark:bg-slate-900 px-2 py-1 rounded text-slate-600 dark:text-slate-400">
                             {item.id}
                           </span>
+                          {item.category && (
+                            <span className="text-[10px] font-bold uppercase tracking-wider bg-amber-100 dark:bg-amber-900/30 text-amber-700 dark:text-amber-400 px-2 py-1 rounded">
+                              {item.category}
+                            </span>
+                          )}
                         </h3>
                         <div className="flex flex-wrap gap-2 mt-2">
                           {item.tags.map((tag) => (

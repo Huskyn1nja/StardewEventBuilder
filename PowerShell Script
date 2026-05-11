@@ -2,6 +2,49 @@ This is a placeholder for the Windows Powershell Script to re-create the data fo
 
 To use: Unpack the game files, Open Windows Powershell, navigate to the folder where Objects.json is located.
 
+$categoryMap = @{
+    "0"    = "Misc"
+    "-2"   = "Gem"
+    "-4"   = "Fish"
+    "-5"   = "Egg"
+    "-6"   = "Milk"
+    "-7"   = "Cooking"
+    "-8"   = "Crafting"
+    "-9"   = "Big Craftable"
+    "-12"  = "Mineral"
+    "-14"  = "Meat"
+    "-15"  = "Metal Resources"
+    "-16"  = "Building Resources"
+    "-17"  = "Sell at Pierre's"
+    "-18"  = "Animal Product"
+    "-19"  = "Fertilizer"
+    "-20"  = "Trash"
+    "-21"  = "Bait"
+    "-22"  = "Fishing Tackle"
+    "-23"  = "Sell at Fish Shop"
+    "-24"  = "Decor"
+    "-25"  = "Ingredient"
+    "-26"  = "Artisan Good"
+    "-27"  = "Syrup"
+    "-28"  = "Monster Loot"
+    "-29"  = "Equipment"
+    "-74"  = "Seed"
+    "-75"  = "Vegetable"
+    "-79"  = "Fruit"
+    "-80"  = "Flower"
+    "-81"  = "Forage"
+    "-95"  = "Hat"
+    "-96"  = "Ring"
+    "-97"  = "Boots"
+    "-98"  = "Weapon"
+    "-99"  = "Tool"
+    "-100" = "Clothing"
+    "-101" = "Trinket"
+    "-102" = "Book"
+    "-103" = "Skill Book"
+    "-999" = "Litter"
+}
+
 $json = Get-Content ".\Objects.json" -Raw | ConvertFrom-Json
 $output = @("export const STARDEW_DICTIONARY = [")
 
@@ -9,9 +52,13 @@ foreach ($prop in $json.psobject.properties) {
     $id = $prop.Name
     $name = $prop.Value.Name -replace '"', '\"'
     $type = $prop.Value.Type
+    
+    $catNum = [string]$prop.Value.Category
+    $catText = if ($categoryMap.ContainsKey($catNum)) { $categoryMap[$catNum] } else { "Unknown ($catNum)" }
+    
     $tags = if ($prop.Value.ContextTags) { ($prop.Value.ContextTags | ForEach-Object { "`"$_`"" }) -join ", " } else { "" }
     
-    $output += "  { id: `"(O)$id`", name: `"$name`", type: `"$type`", tags: [$tags] },"
+    $output += "  { id: `"(O)$id`", name: `"$name`", type: `"$type`", category: `"$catText`", tags: [$tags] },"
 }
 
 $output += "];"
