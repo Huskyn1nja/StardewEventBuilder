@@ -182,13 +182,18 @@ export default function App() {
   const searchResults = useMemo(() => {
     if (!searchQuery) return [];
     const query = searchQuery.toLowerCase();
-    return STARDEW_DICTIONARY.filter(
-      (item: any) =>
+    return STARDEW_DICTIONARY.filter((item: any) => {
+      const categoryTag = item.category
+        ? `category_${item.category.toLowerCase().replace(/\s+/g, "_")}`
+        : "";
+      return (
         item.name?.toLowerCase().includes(query) ||
         item.id?.toLowerCase().includes(query) ||
         item.category?.toLowerCase().includes(query) ||
+        categoryTag.includes(query) ||
         item.tags?.some((tag: string) => tag?.toLowerCase().includes(query))
-    );
+      );
+    });
   }, [searchQuery]);
 
   useEffect(() => {
@@ -3439,16 +3444,16 @@ export default function App() {
                             {item.id}
                           </span>
                           {item.category && (
-                            <span className="text-[10px] font-bold uppercase tracking-wider bg-amber-100 dark:bg-amber-900/30 text-amber-700 dark:text-amber-400 px-2 py-1 rounded">
-                              {item.category}
+                            <span className="text-[10px] font-bold lowercase tracking-wider bg-indigo-100 dark:bg-indigo-900/30 text-indigo-700 dark:text-indigo-400 px-2 py-1 rounded">
+                              category_{item.category.replace(/\s+/g, "_")}
                             </span>
                           )}
                         </h3>
                         <div className="flex flex-wrap gap-2 mt-2">
-                          {item.tags.map((tag) => (
+                          {item.tags.map((tag: string) => (
                             <span
                               key={tag}
-                              className="text-[10px] font-bold uppercase tracking-wider bg-indigo-100 dark:bg-indigo-900/30 text-indigo-700 dark:text-indigo-400 px-2 py-0.5 rounded"
+                              className="text-[10px] font-bold lowercase tracking-wider bg-indigo-100 dark:bg-indigo-900/30 text-indigo-700 dark:text-indigo-400 px-2 py-0.5 rounded"
                             >
                               {tag}
                             </span>
