@@ -1,7 +1,7 @@
 import { useState, useEffect, useCallback, useMemo } from "react";
 import { STARDEW_DICTIONARY } from "./dictionary";
 
-type ToolView = "home" | "event" | "character" | "gift";
+type ToolView = "home" | "event" | "character" | "gift" | "animation";
 
 interface Viewport {
   x: number | string;
@@ -61,21 +61,18 @@ export default function App() {
     }
     return false;
   });
-
   const [isMenuOpen, setIsMenuOpen] = useState<boolean>(false);
   const [showImport, setShowImport] = useState<boolean>(false);
   const [showScriptPreview, setShowScriptPreview] = useState<boolean>(false);
   const [importText, setImportText] = useState<string>("");
   const [i18nText, setI18nText] = useState<string>("");
   const [i18nData, setI18nData] = useState<Record<string, string>>({});
-
   const [savedLocations, setSavedLocations] = useState<string[]>(() => {
     const saved = localStorage.getItem("savedLocations");
     return saved !== null
       ? JSON.parse(saved)
       : ["Railroad", "Town", "Farm", "Saloon", "Mountain"];
   });
-
   const [savedActors, setSavedActors] = useState<string[]>(() => {
     const saved = localStorage.getItem("savedActors");
     return saved !== null
@@ -94,27 +91,22 @@ export default function App() {
           "Maru",
         ];
   });
-
   const [exportAsCP, setExportAsCP] = useState<boolean>(() => {
     const saved = localStorage.getItem("defaultExportAsCP");
     return saved !== null ? JSON.parse(saved) : false;
   });
-
   const [isSkippable, setIsSkippable] = useState<boolean>(() => {
     const saved = localStorage.getItem("defaultSkippable");
     return saved !== null ? JSON.parse(saved) : true;
   });
-
   const [eventId, setEventId] = useState<string>(() => {
     const saved = localStorage.getItem("defaultEventId");
     return saved !== null ? JSON.parse(saved) : "{{ModId}}_Event01";
   });
-
   const [location, setLocation] = useState<string>(() => {
     const saved = localStorage.getItem("defaultLocation");
     return saved !== null ? JSON.parse(saved) : "Railroad";
   });
-
   const [conditions, setConditions] = useState<Condition[]>([
     {
       id: Date.now(),
@@ -123,13 +115,11 @@ export default function App() {
       negated: false,
     },
   ]);
-
   const [music, setMusic] = useState<string>("continue");
   const [viewport, setViewport] = useState<Viewport>({ x: -1000, y: -1000 });
   const [cast, setCast] = useState<CastMember[]>([
     { id: Date.now(), name: "farmer", x: 0, y: 0, facing: 0 },
   ]);
-
   const [timeline, setTimeline] = useState<Command[]>([]);
   const [outputString, setOutputString] = useState<string>("");
 
@@ -171,13 +161,31 @@ export default function App() {
   const [charHomeX, setCharHomeX] = useState<number | string>(0);
   const [charHomeY, setCharHomeY] = useState<number | string>(0);
   const [charHomeDir, setCharHomeDir] = useState("down");
-
   const [charCanVisitIsland, setCharCanVisitIsland] = useState("omit");
   const [charSpouseAdopts, setCharSpouseAdopts] = useState("omit");
   const [charIntroductionsQuest, setCharIntroductionsQuest] = useState("omit");
   const [charItemDeliveryQuests, setCharItemDeliveryQuests] = useState("omit");
-  const [charWinterStarParticipant, setCharWinterStarParticipant] =
-    useState("omit");
+  const [charWinterStarParticipant, setCharWinterStarParticipant] = useState("omit");
+
+  const [animImage, setAnimImage] = useState<string | null>(null);
+  const [animImageWidth, setAnimImageWidth] = useState<number>(0);
+  const [animImageHeight, setAnimImageHeight] = useState<number>(0);
+  const [spriteWidth, setSpriteWidth] = useState<number>(16);
+  const [spriteHeight, setSpriteHeight] = useState<number>(32);
+  const [animDuration, setAnimDuration] = useState<number>(250);
+  
+  const [animEntry, setAnimEntry] = useState<number[]>([]);
+  const [animRepeat, setAnimRepeat] = useState<number[]>([]);
+  const [animLeaving, setAnimLeaving] = useState<number[]>([]);
+  const [hasAdvancedPhases, setHasAdvancedPhases] = useState<boolean>(false);
+
+  const [currentPreviewFrame, setCurrentPreviewFrame] = useState<number>(0);
+  const [animName, setAnimName] = useState<string>("custom_anim");
+  const [animMessage, setAnimMessage] = useState<string>("");
+  const [animLayingDown, setAnimLayingDown] = useState<boolean>(false);
+  const [animOffsetX, setAnimOffsetX] = useState<number>(0);
+  const [animOffsetY, setAnimOffsetY] = useState<number>(0);
+  const [draggedFrame, setDraggedFrame] = useState<{ phase: "entry" | "repeat" | "leaving"; index: number } | null>(null);
 
   const searchResults = useMemo(() => {
     if (!searchQuery) return [];
@@ -237,6 +245,110 @@ export default function App() {
       localStorage.setItem("savedActors", JSON.stringify(mergedActors));
     }
   }, [cast, savedActors]);
+
+  const activeAnimFrames = useMemo(() => {
+    return hasAdvancedPhases ? [...animEntry, ...animRepeat, ...animLeaving] : [...animRepeat];
+  }, [animEntry, animRepeat, animLeaving, hasAdvancedPhases]);
+
+  useEffect(() => {
+    const total = activeAnimFrames.length;
+    if (total === 0) return;
+    const interval = setInterval(() => {
+      setCurrentPreviewFrame((prev: number) => {
+        const next = prev + 1;
+        if (next >= total) {
+          if (hasAdvancedPhases && animRepeat.length > 0) return animEntry.length;
+          return 0;
+        }
+        return next;
+      });
+    }, animDuration);
+    return () => clearInterval(interval);
+  }, [
+    activeAnimFrames.length,
+    animEntry.length,
+    animRepeat.length,
+    animDuration,
+    hasAdvancedPhases,
+  ]);
+
+  const generatedAnimString = useMemo(() => {
+    let parts = hasAdvancedPhases
+      ? [animEntry.join(" "), animRepeat.join(" "), animLeaving.join(" ")]
+      : ["", animRepeat.join(" "), ""];
+
+    const hasOffset = animOffsetX !== 0 || animOffsetY !== 0;
+
+    if (animMessage || animLayingDown || hasOffset) {
+      parts.push(animMessage);
+    }
+    if (animLayingDown) {
+      parts.push("laying_down");
+    }
+    if (hasOffset) {
+      parts.push(`offset ${animOffsetX} ${animOffsetY}`);
+    }
+
+    return parts.join("/");
+  }, [
+    animEntry,
+    animRepeat,
+    animLeaving,
+    hasAdvancedPhases,
+    animMessage,
+    animLayingDown,
+    animOffsetX,
+    animOffsetY,
+  ]);
+
+  const copyToClipboard = useCallback((text: string) => {
+    navigator.clipboard.writeText(text);
+    alert("Code copied to clipboard!");
+  }, []);
+
+  const appendToTaste = useCallback((tasteKey: string, id: string) => {
+    setGiftTastes((prev) => {
+      const currentItems = prev[tasteKey as keyof typeof prev].items;
+      return {
+        ...prev,
+        [tasteKey]: {
+          ...prev[tasteKey as keyof typeof prev],
+          items: currentItems ? `${currentItems} ${id}`.trim() : id,
+        },
+      };
+    });
+    setIsSearchOpen(false);
+  }, []);
+
+  const addSpecificDialogue = useCallback((id: string) => {
+    setItemSpecificDialogues((prev) => [
+      ...prev,
+      { id: Date.now(), itemOrTag: id, dialogue: "" },
+    ]);
+    setIsSearchOpen(false);
+  }, []);
+
+  const handleImageUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (file) {
+      const reader = new FileReader();
+      reader.onload = (event) => {
+        const src = event.target?.result as string;
+        const img = new Image();
+        img.onload = () => {
+          setAnimImageWidth(img.width);
+          setAnimImageHeight(img.height);
+          setAnimImage(src);
+          setAnimEntry([]);
+          setAnimRepeat([]);
+          setAnimLeaving([]);
+          setCurrentPreviewFrame(0);
+        };
+        img.src = src;
+      };
+      reader.readAsDataURL(file);
+    }
+  };
 
   const compileSingleCommand = useCallback((cmd: Command): string => {
     const safeText = cmd.payload.text?.replace(/"/g, '\\"');
@@ -395,7 +507,6 @@ export default function App() {
 
     const timelineString = timeline.map(compileSingleCommand).join("/");
     const finalEvent = `"${key}": "${val}${timelineString}"`;
-
     if (exportAsCP) {
       setOutputString(
         `{\n  "Action": "EditData",\n  "Target": "Data/Events/${location}",\n  "Entries": {\n    ${finalEvent}\n  }\n}`
@@ -428,9 +539,151 @@ export default function App() {
     localStorage.setItem("defaultExportAsCP", JSON.stringify(exportAsCP));
     localStorage.setItem("defaultSkippable", JSON.stringify(isSkippable));
     setIsMenuOpen(false);
-    alert(
-      "Current Event ID, Target Location, Export Format, and Skippable preference have been saved as your defaults!"
-    );
+  };
+
+  const handleImport = () => {
+    try {
+      let rawText = importText.trim();
+      if (rawText.startsWith("{") && rawText.endsWith("}")) {
+        rawText = rawText.slice(1, -1).trim();
+      }
+
+      const parts = rawText.split(/":\s*"/);
+      if (parts.length < 2) {
+        return;
+      }
+
+      let rawKey = parts[0].replace(/^"/, "").trim();
+      let rawScript = parts[1]
+        .replace(/,$/, "")
+        .replace(/"$/, "")
+        .replace(/[\n\r\t]/g, "")
+        .trim();
+      const keyTokens = rawKey.split("/");
+      setEventId(keyTokens[0] || "Imported_Event");
+
+      const parsedConditions: Condition[] = [];
+      for (let i = 1; i < keyTokens.length; i++) {
+        let p = keyTokens[i].trim();
+        if (!p) continue;
+
+        const isNegated = p.startsWith("!");
+        const pCore = isNegated ? p.substring(1).trim() : p;
+        if (pCore.startsWith("Time ") || pCore.startsWith("t ")) {
+          const partsArray = pCore.split(" ");
+          parsedConditions.push({
+            id: Date.now() + i,
+            type: "Time",
+            payload: {
+              min: parseInt(partsArray[1]),
+              max: parseInt(partsArray[2]),
+            },
+            negated: isNegated,
+          });
+        } else if (pCore.startsWith("Friendship ") || pCore.startsWith("f ")) {
+          const partsArray = pCore.split(" ");
+          parsedConditions.push({
+            id: Date.now() + i,
+            type: "Friendship",
+            payload: {
+              actor: partsArray[1],
+              hearts: Math.floor(parseInt(partsArray[2]) / 250),
+            },
+            negated: isNegated,
+          });
+        } else if (pCore.startsWith("Season ") || pCore.startsWith("z ")) {
+          const partsArray = pCore.split(" ");
+          parsedConditions.push({
+            id: Date.now() + i,
+            type: "Season",
+            payload: { season: partsArray[1] },
+            negated: isNegated,
+          });
+        } else if (pCore.startsWith("Weather ") || pCore.startsWith("w ")) {
+          const partsArray = pCore.split(" ");
+          parsedConditions.push({
+            id: Date.now() + i,
+            type: "Weather",
+            payload: { weather: partsArray[1] },
+            negated: isNegated,
+          });
+        } else if (pCore.startsWith("Spouse ") || pCore.startsWith("O ")) {
+          const partsArray = pCore.split(" ");
+          parsedConditions.push({
+            id: Date.now() + i,
+            type: "Custom",
+            payload: { text: `Spouse ${partsArray[1]}` },
+            negated: isNegated,
+          });
+        } else {
+          parsedConditions.push({
+            id: Date.now() + i,
+            type: "Custom",
+            payload: { text: pCore },
+            negated: isNegated,
+          });
+        }
+      }
+      setConditions(parsedConditions);
+
+      const scriptTokens: string[] = [];
+      let currentToken = "";
+      let inQuotes = false;
+
+      for (let i = 0; i < rawScript.length; i++) {
+        const char = rawScript[i];
+        const prevChar = i > 0 ? rawScript[i - 1] : "";
+        if (char === '"' && prevChar === "\\") {
+          inQuotes = !inQuotes;
+        }
+        if (char === "/" && !inQuotes) {
+          scriptTokens.push(currentToken.trim());
+          currentToken = "";
+        } else {
+          currentToken += char;
+        }
+      }
+      if (currentToken) scriptTokens.push(currentToken.trim());
+
+      if (scriptTokens.length >= 3) {
+        setMusic(scriptTokens[0]);
+        const vp = scriptTokens[1].split(" ");
+        setViewport({ x: parseInt(vp[0]) || 0, y: parseInt(vp[1]) || 0 });
+
+        const castList = scriptTokens[2].split(" ").filter((x) => x);
+        const parsedCast: CastMember[] = [];
+        for (let i = 0; i < castList.length; i += 4) {
+          if (castList[i]) {
+            parsedCast.push({
+              id: Date.now() + i,
+              name: castList[i],
+              x: parseInt(castList[i + 1]) || 0,
+              y: parseInt(castList[i + 2]) || 0,
+              facing: parseInt(castList[i + 3]) || 0,
+            });
+          }
+        }
+        setCast(parsedCast);
+        const parsedTimeline: Command[] = [];
+        let foundSkippable = false;
+
+        for (let i = 3; i < scriptTokens.length; i++) {
+          const cmdStr = scriptTokens[i];
+          if (cmdStr === "skippable") {
+            foundSkippable = true;
+            continue;
+          }
+          const parsedCmd = parseSingleCommandString(cmdStr, i);
+          if (parsedCmd) {
+            parsedTimeline.push(parsedCmd);
+          }
+        }
+        setTimeline(parsedTimeline);
+        setIsSkippable(foundSkippable);
+        setShowImport(false);
+        setImportText("");
+      }
+    } catch (error) {}
   };
 
   const parseSingleCommandString = (
@@ -439,7 +692,6 @@ export default function App() {
   ): Command | null => {
     const ts = Date.now() + index;
     if (!cmdStr) return null;
-
     if (cmdStr.startsWith("speak ")) {
       const firstSpace = cmdStr.indexOf(" ");
       const secondSpace = cmdStr.indexOf(" ", firstSpace + 1);
@@ -691,7 +943,6 @@ export default function App() {
       const headerParts = branchParts[0].split("#");
       const prompt = headerParts[0];
       const options: QuestionOption[] = [];
-
       for (let i = 1; i < headerParts.length; i++) {
         const branchStr = branchParts[i] || "";
         const rawNested = branchStr.split(/\\\\|\\/).filter((x) => x);
@@ -710,175 +961,11 @@ export default function App() {
     }
   };
 
-  const handleImport = () => {
-    try {
-      let rawText = importText.trim();
-
-      if (rawText.startsWith("{") && rawText.endsWith("}")) {
-        rawText = rawText.slice(1, -1).trim();
-      }
-
-      const parts = rawText.split(/":\s*"/);
-      if (parts.length < 2) {
-        alert(
-          'Invalid format! Please paste a single full event line like: "EventID/Time 600": "music/viewport/cast/commands..."'
-        );
-        return;
-      }
-
-      let rawKey = parts[0].replace(/^"/, "").trim();
-      let rawScript = parts[1]
-        .replace(/,$/, "")
-        .replace(/"$/, "")
-        .replace(/[\n\r\t]/g, "")
-        .trim();
-
-      const keyTokens = rawKey.split("/");
-      setEventId(keyTokens[0] || "Imported_Event");
-
-      const parsedConditions: Condition[] = [];
-      for (let i = 1; i < keyTokens.length; i++) {
-        let p = keyTokens[i].trim();
-        if (!p) continue;
-
-        const isNegated = p.startsWith("!");
-        const pCore = isNegated ? p.substring(1).trim() : p;
-
-        if (pCore.startsWith("Time ") || pCore.startsWith("t ")) {
-          const partsArray = pCore.split(" ");
-          parsedConditions.push({
-            id: Date.now() + i,
-            type: "Time",
-            payload: {
-              min: parseInt(partsArray[1]),
-              max: parseInt(partsArray[2]),
-            },
-            negated: isNegated,
-          });
-        } else if (pCore.startsWith("Friendship ") || pCore.startsWith("f ")) {
-          const partsArray = pCore.split(" ");
-          parsedConditions.push({
-            id: Date.now() + i,
-            type: "Friendship",
-            payload: {
-              actor: partsArray[1],
-              hearts: Math.floor(parseInt(partsArray[2]) / 250),
-            },
-            negated: isNegated,
-          });
-        } else if (pCore.startsWith("Season ") || pCore.startsWith("z ")) {
-          const partsArray = pCore.split(" ");
-          parsedConditions.push({
-            id: Date.now() + i,
-            type: "Season",
-            payload: { season: partsArray[1] },
-            negated: isNegated,
-          });
-        } else if (pCore.startsWith("Weather ") || pCore.startsWith("w ")) {
-          const partsArray = pCore.split(" ");
-          parsedConditions.push({
-            id: Date.now() + i,
-            type: "Weather",
-            payload: { weather: partsArray[1] },
-            negated: isNegated,
-          });
-        } else if (pCore.startsWith("Spouse ") || pCore.startsWith("O ")) {
-          const partsArray = pCore.split(" ");
-          parsedConditions.push({
-            id: Date.now() + i,
-            type: "Custom",
-            payload: { text: `Spouse ${partsArray[1]}` },
-            negated: isNegated,
-          });
-        } else {
-          parsedConditions.push({
-            id: Date.now() + i,
-            type: "Custom",
-            payload: { text: pCore },
-            negated: isNegated,
-          });
-        }
-      }
-      setConditions(parsedConditions);
-
-      const scriptTokens: string[] = [];
-      let currentToken = "";
-      let inQuotes = false;
-
-      for (let i = 0; i < rawScript.length; i++) {
-        const char = rawScript[i];
-        const prevChar = i > 0 ? rawScript[i - 1] : "";
-        if (char === '"' && prevChar === "\\") {
-          inQuotes = !inQuotes;
-        }
-        if (char === "/" && !inQuotes) {
-          scriptTokens.push(currentToken.trim());
-          currentToken = "";
-        } else {
-          currentToken += char;
-        }
-      }
-      if (currentToken) scriptTokens.push(currentToken.trim());
-
-      if (scriptTokens.length >= 3) {
-        setMusic(scriptTokens[0]);
-        const vp = scriptTokens[1].split(" ");
-        setViewport({ x: parseInt(vp[0]) || 0, y: parseInt(vp[1]) || 0 });
-
-        const castList = scriptTokens[2].split(" ").filter((x) => x);
-        const parsedCast: CastMember[] = [];
-        for (let i = 0; i < castList.length; i += 4) {
-          if (castList[i]) {
-            parsedCast.push({
-              id: Date.now() + i,
-              name: castList[i],
-              x: parseInt(castList[i + 1]) || 0,
-              y: parseInt(castList[i + 2]) || 0,
-              facing: parseInt(castList[i + 3]) || 0,
-            });
-          }
-        }
-        setCast(parsedCast);
-
-        const parsedTimeline: Command[] = [];
-        let foundSkippable = false;
-
-        for (let i = 3; i < scriptTokens.length; i++) {
-          const cmdStr = scriptTokens[i];
-          if (cmdStr === "skippable") {
-            foundSkippable = true;
-            continue;
-          }
-          const parsedCmd = parseSingleCommandString(cmdStr, i);
-          if (parsedCmd) {
-            parsedTimeline.push(parsedCmd);
-          }
-        }
-        setTimeline(parsedTimeline);
-        setIsSkippable(foundSkippable);
-        setShowImport(false);
-        setImportText("");
-        alert("Event successfully imported!");
-      } else {
-        alert(
-          "Parsed successfully, but it appears to be a sub-event missing the music/viewport/cast headers. Timeline actions may be slightly scrambled."
-        );
-      }
-    } catch (error) {
-      console.error(error);
-      alert(
-        "Failed to parse event. Make sure it matches the exact Stardew Valley JSON format."
-      );
-    }
-  };
-
   const handleParseI18n = () => {
     try {
       const parsed = JSON.parse(i18nText);
       setI18nData(parsed);
-    } catch (e) {
-      alert("Invalid JSON format for i18n data.");
-    }
+    } catch (e) {}
   };
 
   const replaceI18n = (str: string) => {
@@ -889,44 +976,36 @@ export default function App() {
   };
 
   const handleReset = () => {
-    if (
-      window.confirm(
-        "Are you sure you want to clear the entire event? This cannot be undone."
-      )
-    ) {
-      const savedEventId = localStorage.getItem("defaultEventId");
-      const savedLocation = localStorage.getItem("defaultLocation");
-      const savedExportAsCP = localStorage.getItem("defaultExportAsCP");
-      const savedSkippable = localStorage.getItem("defaultSkippable");
+    const savedEventId = localStorage.getItem("defaultEventId");
+    const savedLocation = localStorage.getItem("defaultLocation");
+    const savedExportAsCP = localStorage.getItem("defaultExportAsCP");
+    const savedSkippable = localStorage.getItem("defaultSkippable");
 
-      setEventId(
-        savedEventId !== null ? JSON.parse(savedEventId) : "{{ModId}}_Event01"
-      );
-      setLocation(
-        savedLocation !== null ? JSON.parse(savedLocation) : "Railroad"
-      );
-      setExportAsCP(
-        savedExportAsCP !== null ? JSON.parse(savedExportAsCP) : false
-      );
-      setIsSkippable(
-        savedSkippable !== null ? JSON.parse(savedSkippable) : true
-      );
+    setEventId(
+      savedEventId !== null ? JSON.parse(savedEventId) : "{{ModId}}_Event01"
+    );
+    setLocation(
+      savedLocation !== null ? JSON.parse(savedLocation) : "Railroad"
+    );
+    setExportAsCP(
+      savedExportAsCP !== null ? JSON.parse(savedExportAsCP) : false
+    );
+    setIsSkippable(savedSkippable !== null ? JSON.parse(savedSkippable) : true);
 
-      setConditions([
-        {
-          id: Date.now(),
-          type: "Time",
-          payload: { min: 600, max: 1200 },
-          negated: false,
-        },
-      ]);
-      setMusic("continue");
-      setViewport({ x: -1000, y: -1000 });
-      setCast([{ id: Date.now(), name: "farmer", x: 0, y: 0, facing: 0 }]);
-      setTimeline([]);
-      setImportText("");
-      setShowImport(false);
-    }
+    setConditions([
+      {
+        id: Date.now(),
+        type: "Time",
+        payload: { min: 600, max: 1200 },
+        negated: false,
+      },
+    ]);
+    setMusic("continue");
+    setViewport({ x: -1000, y: -1000 });
+    setCast([{ id: Date.now(), name: "farmer", x: 0, y: 0, facing: 0 }]);
+    setTimeline([]);
+    setImportText("");
+    setShowImport(false);
   };
 
   const addCondition = (type: string) => {
@@ -1313,11 +1392,6 @@ export default function App() {
         return cmd;
       })
     );
-  };
-
-  const copyToClipboard = (text: string) => {
-    navigator.clipboard.writeText(text);
-    alert("Code copied to clipboard!");
   };
 
   const renderScriptLine = (cmd: Command) => {
@@ -2891,7 +2965,7 @@ export default function App() {
                         e.target.checked
                       )
                     : updateCommand(cmd.id, "add", e.target.checked)
-                }
+              }
               />
               <span>Add Flag</span>
             </label>
@@ -3309,7 +3383,7 @@ export default function App() {
                     )
                   : updateCommand(cmd.id, "style", e.target.value)
               }
-            >
+             >
               <option value="end">Standard</option>
               <option value="end warpOut">Exit Location</option>
               <option value="end invisible">End Invisible</option>
@@ -3344,28 +3418,180 @@ export default function App() {
     }
   };
 
-  const appendToTaste = (tasteKey: string, id: string) => {
-    setGiftTastes((prev) => {
-      const currentItems = prev[tasteKey as keyof typeof prev].items;
-      return {
-        ...prev,
-        [tasteKey]: {
-          ...prev[tasteKey as keyof typeof prev],
-          items: currentItems ? `${currentItems} ${id}`.trim() : id,
-        },
-      };
-    });
-
-    setIsSearchOpen(false);
+  const handleDragStart = (
+    e: React.DragEvent,
+    phase: "entry" | "repeat" | "leaving",
+    index: number
+  ) => {
+    setDraggedFrame({ phase, index });
+    e.dataTransfer.effectAllowed = "move";
   };
 
-  const addSpecificDialogue = (id: string) => {
-    setItemSpecificDialogues((prev) => [
-      ...prev,
-      { id: Date.now(), itemOrTag: id, dialogue: "" },
-    ]);
-    setIsSearchOpen(false);
+  const handleDragOver = (e: React.DragEvent) => {
+    e.preventDefault();
+    e.dataTransfer.dropEffect = "move";
   };
+
+  const handleDrop = (
+    e: React.DragEvent,
+    targetPhase: "entry" | "repeat" | "leaving",
+    targetIndex: number
+  ) => {
+    e.preventDefault();
+    if (!draggedFrame) return;
+
+    if (
+      draggedFrame.phase === targetPhase &&
+      draggedFrame.index === targetIndex
+    ) {
+      setDraggedFrame(null);
+      return;
+    }
+
+    let sourceArray: number[] = [];
+    if (draggedFrame.phase === "entry") sourceArray = [...animEntry];
+    if (draggedFrame.phase === "repeat") sourceArray = [...animRepeat];
+    if (draggedFrame.phase === "leaving") sourceArray = [...animLeaving];
+
+    const frameValue = sourceArray[draggedFrame.index];
+    sourceArray.splice(draggedFrame.index, 1);
+    
+    if (draggedFrame.phase === "entry") setAnimEntry(sourceArray);
+    if (draggedFrame.phase === "repeat") setAnimRepeat(sourceArray);
+    if (draggedFrame.phase === "leaving") setAnimLeaving(sourceArray);
+
+    let targetArray: number[] = [];
+    if (targetPhase === "entry")
+      targetArray = draggedFrame.phase === "entry" ? sourceArray : [...animEntry];
+    if (targetPhase === "repeat")
+      targetArray = draggedFrame.phase === "repeat" ? sourceArray : [...animRepeat];
+    if (targetPhase === "leaving")
+      targetArray = draggedFrame.phase === "leaving" ? sourceArray : [...animLeaving];
+
+    targetArray.splice(targetIndex, 0, frameValue);
+
+    if (targetPhase === "entry") setAnimEntry(targetArray);
+    if (targetPhase === "repeat") setAnimRepeat(targetArray);
+    if (targetPhase === "leaving") setAnimLeaving(targetArray);
+
+    setDraggedFrame(null);
+  };
+
+  const checkerboardStyle = {
+    backgroundImage:
+      "repeating-linear-gradient(45deg, #ccc 25%, transparent 25%, transparent 75%, #ccc 75%, #ccc), repeating-linear-gradient(45deg, #ccc 25%, #fff 25%, #fff 75%, #ccc 75%, #ccc)",
+    backgroundPosition: "0 0, 8px 8px",
+    backgroundSize: "16px 16px",
+  };
+
+  const darkCheckerboardStyle = {
+    backgroundImage:
+      "repeating-linear-gradient(45deg, #333 25%, transparent 25%, transparent 75%, #333 75%, #333), repeating-linear-gradient(45deg, #333 25%, #222 25%, #222 75%, #333 75%, #333)",
+    backgroundPosition: "0 0, 8px 8px",
+    backgroundSize: "16px 16px",
+  };
+
+  const cols =
+    animImageWidth > 0 && spriteWidth > 0
+      ? Math.max(1, Math.floor(animImageWidth / spriteWidth))
+      : 1;
+
+  const rows =
+    animImageHeight > 0 && spriteHeight > 0
+      ? Math.max(1, Math.floor(animImageHeight / spriteHeight))
+      : 1;
+
+  const totalFrames = cols * rows;
+
+  const activeFrame = activeAnimFrames[currentPreviewFrame] ?? activeAnimFrames[0] ?? 0;
+  const activeRow = Math.floor(activeFrame / cols);
+  const activeCol = activeFrame % cols;
+
+  const exportAsGif = useCallback(async () => {
+    if (!animImage || activeAnimFrames.length === 0) return;
+
+    const startExport = async () => {
+      try {
+        const workerRes = await fetch(
+          "https://cdn.jsdelivr.net/npm/gif.js/dist/gif.worker.js"
+        );
+        const workerBlob = await workerRes.blob();
+        const workerUrl = URL.createObjectURL(workerBlob);
+
+        const gif = new (window as any).GIF({
+          workers: 2,
+          quality: 10,
+          workerScript: workerUrl,
+          transparent: "rgba(0,0,0,0)",
+        });
+
+        const canvas = document.createElement("canvas");
+        canvas.width = spriteWidth * 8;
+        canvas.height = spriteHeight * 8;
+        const ctx = canvas.getContext("2d");
+        
+        if (!ctx) return;
+
+        ctx.imageSmoothingEnabled = false;
+
+        const img = new Image();
+        img.src = animImage;
+        img.onload = () => {
+          activeAnimFrames.forEach((frame) => {
+            ctx.clearRect(0, 0, canvas.width, canvas.height);
+            const r = Math.floor(frame / cols);
+            const c = frame % cols;
+            ctx.drawImage(
+              img,
+              c * spriteWidth,
+              r * spriteHeight,
+              spriteWidth,
+              spriteHeight,
+              0,
+              0,
+              spriteWidth * 8,
+              spriteHeight * 8
+            );
+            gif.addFrame(canvas, { copy: true, delay: animDuration });
+          });
+
+          gif.on("finished", (blob: Blob) => {
+            const url = URL.createObjectURL(blob);
+            const a = document.createElement("a");
+            a.href = url;
+            a.download = `${animName}.gif`;
+            document.body.appendChild(a);
+            a.click();
+            document.body.removeChild(a);
+
+            URL.revokeObjectURL(url);
+            URL.revokeObjectURL(workerUrl);
+          });
+          gif.render();
+        };
+      } catch (error) {
+        console.error("Failed to generate GIF:", error);
+        alert("Failed to generate GIF. Check browser console for errors.");
+      }
+    };
+
+    if (!(window as any).GIF) {
+      const script = document.createElement("script");
+      script.src = "https://cdn.jsdelivr.net/npm/gif.js/dist/gif.js";
+      script.onload = startExport;
+      document.body.appendChild(script);
+    } else {
+      startExport();
+    }
+  }, [
+    animImage,
+    activeAnimFrames,
+    spriteWidth,
+    spriteHeight,
+    cols,
+    animDuration,
+    animName,
+  ]);
 
   return (
     <div className="min-h-screen bg-slate-100 dark:bg-slate-950 transition-colors font-sans relative">
@@ -3431,88 +3657,95 @@ export default function App() {
                   No items found matching "{searchQuery}"
                 </div>
               ) : (
-                searchResults.map((item) => (
-                  <div
-                    key={item.id}
-                    className="flex flex-col p-3 rounded bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 hover:border-rose-500 transition-colors group"
-                  >
-                    <div className="flex justify-between items-start">
-                      <div>
-                        <h3 className="font-bold text-lg dark:text-white flex items-center gap-3">
-                          {item.name}
-                          <span className="text-xs font-mono bg-slate-200 dark:bg-slate-900 px-2 py-1 rounded text-slate-600 dark:text-slate-400">
-                            {item.id}
-                          </span>
-                          {item.category && (
-                            <span className="text-[10px] font-bold lowercase tracking-wider bg-indigo-100 dark:bg-indigo-900/30 text-indigo-700 dark:text-indigo-400 px-2 py-1 rounded">
-                              category_{item.category.replace(/\s+/g, "_")}
+                searchResults.map((item) => {
+                  const categoryTag = item.category
+                    ? `category_${item.category
+                        .toLowerCase()
+                        .replace(/\s+/g, "_")}`
+                    : "";
+                  return (
+                    <div
+                      key={item.id}
+                      className="flex flex-col p-3 rounded bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 hover:border-rose-500 transition-colors group"
+                    >
+                      <div className="flex justify-between items-start">
+                        <div>
+                          <h3 className="font-bold text-lg dark:text-white flex items-center gap-3">
+                            {item.name}
+                            <span className="text-xs font-mono bg-slate-200 dark:bg-slate-900 px-2 py-1 rounded text-slate-600 dark:text-slate-400">
+                              {item.id}
                             </span>
-                          )}
-                        </h3>
-                        <div className="flex flex-wrap gap-2 mt-2">
-                          {item.tags.map((tag: string) => (
-                            <span
-                              key={tag}
-                              className="text-[10px] font-bold lowercase tracking-wider bg-indigo-100 dark:bg-indigo-900/30 text-indigo-700 dark:text-indigo-400 px-2 py-0.5 rounded"
-                            >
-                              {tag}
-                            </span>
-                          ))}
+                            {categoryTag && (
+                              <span className="text-[10px] font-bold uppercase tracking-wider bg-amber-100 dark:bg-amber-900/30 text-amber-700 dark:text-amber-400 px-2 py-1 rounded">
+                                {categoryTag}
+                              </span>
+                            )}
+                          </h3>
+                          <div className="flex flex-wrap gap-2 mt-2">
+                            {item.tags?.map((tag: string) => (
+                              <span
+                                key={tag}
+                                className="text-[10px] font-bold uppercase tracking-wider bg-indigo-100 dark:bg-indigo-900/30 text-indigo-700 dark:text-indigo-400 px-2 py-0.5 rounded"
+                              >
+                                {tag}
+                              </span>
+                            ))}
+                          </div>
                         </div>
+                        <button
+                          onClick={() => {
+                            navigator.clipboard.writeText(item.id);
+                            alert(`Copied ${item.id} to clipboard!`);
+                          }}
+                          className="text-xs bg-slate-200 dark:bg-slate-700 text-slate-700 dark:text-slate-300 font-bold py-1 px-2 rounded transition-all"
+                        >
+                          Copy ID
+                        </button>
                       </div>
-                      <button
-                        onClick={() => {
-                          navigator.clipboard.writeText(item.id);
-                          alert(`Copied ${item.id} to clipboard!`);
-                        }}
-                        className="text-xs bg-slate-200 dark:bg-slate-700 text-slate-700 dark:text-slate-300 font-bold py-1 px-2 rounded transition-all"
-                      >
-                        Copy ID
-                      </button>
+                      <div className="flex flex-wrap gap-2 mt-4 pt-3 border-t border-slate-200 dark:border-slate-700/50">
+                        <span className="text-xs font-bold text-slate-400 self-center mr-2">
+                          Insert Into:
+                        </span>
+                        <button
+                          onClick={() => appendToTaste("love", item.id)}
+                          className="text-[10px] font-bold uppercase tracking-wider bg-pink-100 dark:bg-pink-900/30 text-pink-700 dark:text-pink-400 px-3 py-1.5 rounded hover:bg-pink-200 dark:hover:bg-pink-900/50 transition-colors"
+                        >
+                          [ Love ]
+                        </button>
+                        <button
+                          onClick={() => appendToTaste("like", item.id)}
+                          className="text-[10px] font-bold uppercase tracking-wider bg-emerald-100 dark:bg-emerald-900/30 text-emerald-700 dark:text-emerald-400 px-3 py-1.5 rounded hover:bg-emerald-200 dark:hover:bg-emerald-900/50 transition-colors"
+                        >
+                          [ Like ]
+                        </button>
+                        <button
+                          onClick={() => appendToTaste("neutral", item.id)}
+                          className="text-[10px] font-bold uppercase tracking-wider bg-slate-200 dark:bg-slate-800 text-slate-700 dark:text-slate-300 px-3 py-1.5 rounded hover:bg-slate-300 dark:hover:bg-slate-700 transition-colors"
+                        >
+                          [ Neutral ]
+                        </button>
+                        <button
+                          onClick={() => appendToTaste("dislike", item.id)}
+                          className="text-[10px] font-bold uppercase tracking-wider bg-orange-100 dark:bg-orange-900/30 text-orange-700 dark:text-orange-400 px-3 py-1.5 rounded hover:bg-orange-200 dark:hover:bg-orange-900/50 transition-colors"
+                        >
+                          [ Dislike ]
+                        </button>
+                        <button
+                          onClick={() => appendToTaste("hate", item.id)}
+                          className="text-[10px] font-bold uppercase tracking-wider bg-red-100 dark:bg-red-900/30 text-red-700 dark:text-red-400 px-3 py-1.5 rounded hover:bg-red-200 dark:hover:bg-red-900/50 transition-colors"
+                        >
+                          [ Hate ]
+                        </button>
+                        <button
+                          onClick={() => addSpecificDialogue(item.id)}
+                          className="text-[10px] font-bold uppercase tracking-wider bg-rose-100 dark:bg-rose-900/30 text-rose-700 dark:text-rose-400 px-3 py-1.5 rounded hover:bg-rose-200 dark:hover:bg-rose-900/50 transition-colors ml-auto"
+                        >
+                          + Specific Dialogue
+                        </button>
+                      </div>
                     </div>
-                    <div className="flex flex-wrap gap-2 mt-4 pt-3 border-t border-slate-200 dark:border-slate-700/50">
-                      <span className="text-xs font-bold text-slate-400 self-center mr-2">
-                        Insert Into:
-                      </span>
-                      <button
-                        onClick={() => appendToTaste("love", item.id)}
-                        className="text-[10px] font-bold uppercase tracking-wider bg-pink-100 dark:bg-pink-900/30 text-pink-700 dark:text-pink-400 px-3 py-1.5 rounded hover:bg-pink-200 dark:hover:bg-pink-900/50 transition-colors"
-                      >
-                        [ Love ]
-                      </button>
-                      <button
-                        onClick={() => appendToTaste("like", item.id)}
-                        className="text-[10px] font-bold uppercase tracking-wider bg-emerald-100 dark:bg-emerald-900/30 text-emerald-700 dark:text-emerald-400 px-3 py-1.5 rounded hover:bg-emerald-200 dark:hover:bg-emerald-900/50 transition-colors"
-                      >
-                        [ Like ]
-                      </button>
-                      <button
-                        onClick={() => appendToTaste("neutral", item.id)}
-                        className="text-[10px] font-bold uppercase tracking-wider bg-slate-200 dark:bg-slate-800 text-slate-700 dark:text-slate-300 px-3 py-1.5 rounded hover:bg-slate-300 dark:hover:bg-slate-700 transition-colors"
-                      >
-                        [ Neutral ]
-                      </button>
-                      <button
-                        onClick={() => appendToTaste("dislike", item.id)}
-                        className="text-[10px] font-bold uppercase tracking-wider bg-orange-100 dark:bg-orange-900/30 text-orange-700 dark:text-orange-400 px-3 py-1.5 rounded hover:bg-orange-200 dark:hover:bg-orange-900/50 transition-colors"
-                      >
-                        [ Dislike ]
-                      </button>
-                      <button
-                        onClick={() => appendToTaste("hate", item.id)}
-                        className="text-[10px] font-bold uppercase tracking-wider bg-red-100 dark:bg-red-900/30 text-red-700 dark:text-red-400 px-3 py-1.5 rounded hover:bg-red-200 dark:hover:bg-red-900/50 transition-colors"
-                      >
-                        [ Hate ]
-                      </button>
-                      <button
-                        onClick={() => addSpecificDialogue(item.id)}
-                        className="text-[10px] font-bold uppercase tracking-wider bg-rose-100 dark:bg-rose-900/30 text-rose-700 dark:text-rose-400 px-3 py-1.5 rounded hover:bg-rose-200 dark:hover:bg-rose-900/50 transition-colors ml-auto"
-                      >
-                        + Specific Dialogue
-                      </button>
-                    </div>
-                  </div>
-                ))
+                  );
+                })
               )}
             </div>
           </div>
@@ -3530,7 +3763,7 @@ export default function App() {
               but figured he'd share
             </p>
 
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-6 w-full max-w-5xl">
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-6 w-full max-w-5xl mb-6">
               <button
                 onClick={() => setActiveTool("event")}
                 className="group bg-white dark:bg-slate-900 border-2 border-emerald-500 hover:border-emerald-400 p-8 rounded-xl shadow-lg transition-all hover:-translate-y-1 hover:shadow-xl text-left flex flex-col items-start"
@@ -3578,6 +3811,21 @@ export default function App() {
                   stuff
                 </p>
               </button>
+
+              <button
+                onClick={() => setActiveTool("animation")}
+                className="group bg-white dark:bg-slate-900 border-2 border-fuchsia-500 hover:border-fuchsia-400 p-8 rounded-xl shadow-lg transition-all hover:-translate-y-1 hover:shadow-xl text-left flex flex-col items-start"
+              >
+                <div className="bg-fuchsia-100 dark:bg-fuchsia-900/50 p-4 rounded-lg mb-4 text-fuchsia-600 dark:text-fuchsia-400 font-bold">
+                  An
+                </div>
+                <h2 className="text-2xl font-bold text-slate-800 dark:text-slate-200 mb-2 group-hover:text-fuchsia-600 dark:group-hover:text-fuchsia-400 transition-colors">
+                  Animation Builder
+                </h2>
+                <p className="text-slate-600 dark:text-slate-400 text-sm">
+                  Upload your spritesheet and build animations, export a gif, or just watch your silly little person walk around.
+                </p>
+              </button>
             </div>
           </div>
         )}
@@ -3608,7 +3856,6 @@ export default function App() {
             if (charWinterStarParticipant !== "omit")
               charEntry.WinterStarParticipant =
                 charWinterStarParticipant === "true";
-
             charEntry.Home = [
               {
                 Id: "Default",
@@ -3617,7 +3864,6 @@ export default function App() {
                 Direction: charHomeDir,
               },
             ];
-
             const charCpJson = JSON.stringify(
               {
                 Action: "EditData",
@@ -3629,7 +3875,6 @@ export default function App() {
               null,
               2
             );
-
             return (
               <div>
                 <div className="max-w-4xl mx-auto">
@@ -3698,7 +3943,7 @@ export default function App() {
                           </div>
                           <div className="flex-1">
                             <label className="block text-xs font-bold text-slate-500 mb-1">
-                              Birth Day
+                               Birth Day
                             </label>
                             <input
                               type="text"
@@ -3773,7 +4018,7 @@ export default function App() {
                               Manner
                             </label>
                             <select
-                              className="w-full border border-slate-300 dark:border-slate-600 p-2 rounded bg-white dark:bg-slate-800 dark:text-white text-sm"
+                               className="w-full border border-slate-300 dark:border-slate-600 p-2 rounded bg-white dark:bg-slate-800 dark:text-white text-sm"
                               value={charManner}
                               onChange={(e) => setCharManner(e.target.value)}
                             >
@@ -3789,13 +4034,13 @@ export default function App() {
                               Social Anxiety
                             </label>
                             <select
-                              className="w-full border border-slate-300 dark:border-slate-600 p-2 rounded bg-white dark:bg-slate-800 dark:text-white text-sm"
+                               className="w-full border border-slate-300 dark:border-slate-600 p-2 rounded bg-white dark:bg-slate-800 dark:text-white text-sm"
                               value={charSocialAnxiety}
                               onChange={(e) =>
-                                setCharSocialAnxiety(e.target.value)
+                                 setCharSocialAnxiety(e.target.value)
                               }
                             >
-                              {["Neutral", "Outgoing", "Shy"].map((s) => (
+                               {["Neutral", "Outgoing", "Shy"].map((s) => (
                                 <option key={s} value={s}>
                                   {s}
                                 </option>
@@ -3810,23 +4055,23 @@ export default function App() {
                               Optimism
                             </label>
                             <select
-                              className="w-full border border-slate-300 dark:border-slate-600 p-2 rounded bg-white dark:bg-slate-800 dark:text-white text-sm"
+                               className="w-full border border-slate-300 dark:border-slate-600 p-2 rounded bg-white dark:bg-slate-800 dark:text-white text-sm"
                               value={charOptimism}
                               onChange={(e) => setCharOptimism(e.target.value)}
                             >
                               {["Neutral", "Positive", "Negative"].map((s) => (
                                 <option key={s} value={s}>
-                                  {s}
+                                   {s}
                                 </option>
                               ))}
                             </select>
                           </div>
                           <div className="flex-1 pb-2">
                             <label className="flex items-center gap-2 cursor-pointer font-bold text-slate-600 dark:text-slate-300 text-sm">
-                              <input
+                               <input
                                 type="checkbox"
                                 checked={charCanBeRomanced}
-                                onChange={(e) =>
+                                 onChange={(e) =>
                                   setCharCanBeRomanced(e.target.checked)
                                 }
                                 className="accent-indigo-500 w-4 h-4 cursor-pointer"
@@ -3861,7 +4106,7 @@ export default function App() {
                                 onChange={(e) => setCharHomeX(e.target.value)}
                               />
                             </div>
-                            <div className="flex-1">
+                             <div className="flex-1">
                               <label className="block text-xs font-bold text-slate-500 mb-1">
                                 Tile Y
                               </label>
@@ -3870,7 +4115,7 @@ export default function App() {
                                 className="w-full border border-slate-300 dark:border-slate-600 p-2 rounded bg-white dark:bg-slate-800 dark:text-white text-sm"
                                 value={charHomeY}
                                 onChange={(e) => setCharHomeY(e.target.value)}
-                              />
+                               />
                             </div>
                             <div className="flex-1">
                               <label className="block text-xs font-bold text-slate-500 mb-1">
@@ -3950,13 +4195,13 @@ export default function App() {
                               Item Delivery Quests
                             </label>
                             <select
-                              className="w-full border border-slate-300 dark:border-slate-600 p-2 rounded bg-white dark:bg-slate-800 dark:text-white text-sm"
+                               className="w-full border border-slate-300 dark:border-slate-600 p-2 rounded bg-white dark:bg-slate-800 dark:text-white text-sm"
                               value={charItemDeliveryQuests}
                               onChange={(e) =>
-                                setCharItemDeliveryQuests(e.target.value)
+                               setCharItemDeliveryQuests(e.target.value)
                               }
                             >
-                              <option value="omit">Omit (Default)</option>
+                               <option value="omit">Omit (Default)</option>
                               <option value="true">True</option>
                               <option value="false">False</option>
                             </select>
@@ -3998,9 +4243,8 @@ export default function App() {
                       />
                     </div>
                     <button
-                      onClick={() => {
-                        navigator.clipboard.writeText(charCpJson);
-                        alert("Character Data JSON copied to clipboard!");
+                       onClick={() => {
+                        copyToClipboard(charCpJson);
                       }}
                       className="bg-indigo-600 hover:bg-indigo-700 text-white font-bold py-4 px-8 rounded-lg whitespace-nowrap shadow-lg transition-colors text-lg"
                     >
@@ -4041,7 +4285,6 @@ export default function App() {
                     )}"`
                 )
                 .join(",\n");
-
               if (specificEntriesStr) {
                 giftCpJson = `[\n  ${giftCpJson},\n  {\n    "Action": "EditData",\n    "Target": "Characters/Dialogue/${giftNpcId}",\n    "Entries": {\n  ${specificEntriesStr}\n    }\n  }\n]`;
               }
@@ -4263,7 +4506,7 @@ export default function App() {
                                 className="w-full border border-slate-300 dark:border-slate-600 p-2 rounded bg-white dark:bg-slate-800 dark:text-white font-mono text-sm"
                                 placeholder="e.g. 74"
                                 value={spec.itemOrTag}
-                                onChange={(e) => {
+                                 onChange={(e) => {
                                   const newSpecs = [...itemSpecificDialogues];
                                   newSpecs[i].itemOrTag = e.target.value;
                                   setItemSpecificDialogues(newSpecs);
@@ -4277,7 +4520,7 @@ export default function App() {
                               <textarea
                                 className="w-full border border-slate-300 dark:border-slate-600 p-2 rounded bg-white dark:bg-slate-800 dark:text-white text-sm h-10 resize-y"
                                 value={spec.dialogue}
-                                onChange={(e) => {
+                                 onChange={(e) => {
                                   const newSpecs = [...itemSpecificDialogues];
                                   newSpecs[i].dialogue = e.target.value;
                                   setItemSpecificDialogues(newSpecs);
@@ -4288,10 +4531,10 @@ export default function App() {
                               onClick={() =>
                                 setItemSpecificDialogues(
                                   itemSpecificDialogues.filter(
-                                    (s) => s.id !== spec.id
+                                     (s) => s.id !== spec.id
                                   )
                                 )
-                              }
+                               }
                               className="text-red-400 hover:text-red-600 font-bold mt-6"
                             >
                               X
@@ -4302,7 +4545,7 @@ export default function App() {
                         <button
                           onClick={() =>
                             setItemSpecificDialogues([
-                              ...itemSpecificDialogues,
+                               ...itemSpecificDialogues,
                               { id: Date.now(), itemOrTag: "", dialogue: "" },
                             ])
                           }
@@ -4331,8 +4574,28 @@ export default function App() {
                     </div>
                     <button
                       onClick={() => {
-                        navigator.clipboard.writeText(giftCpJson);
-                        alert("Gift Tastes JSON copied to clipboard!");
+                        const outStr = `{\n  "Action": "EditData",\n  "Target": "Data/NPCGiftTastes",\n  "Entries": {\n    "${giftNpcId}": "${Object.keys(
+                          giftTastes
+                        )
+                          .map(
+                            (k) =>
+                              `${giftTastes[k as keyof typeof giftTastes].dialogs
+                                .join("#")
+                                .replace(/"/g, '\\"')}/${giftTastes[k as keyof typeof giftTastes].items}`
+                          )
+                          .join("/")}/"\n  }\n}${
+                          itemSpecificDialogues.length
+                            ? `,\n{\n  "Action": "EditData",\n  "Target": "Characters/Dialogue/${giftNpcId}",\n  "Entries": {\n${itemSpecificDialogues
+                                .map(
+                                  (d) =>
+                                    `    "AcceptGift_${
+                                      d.itemOrTag
+                                    }": "${d.dialogue.replace(/"/g, '\\"')}"`
+                                )
+                                .join(",\n")}\n  }\n}`
+                            : ""
+                        }`;
+                        copyToClipboard(outStr);
                       }}
                       className="bg-rose-600 hover:bg-rose-700 text-white font-bold py-4 px-8 rounded-lg whitespace-nowrap shadow-lg transition-colors text-lg"
                     >
@@ -4372,12 +4635,12 @@ export default function App() {
                       </button>
                     </div>
                     <p className="text-sm text-slate-500 mb-2">
-                      Paste your i18n JSON data here to replace keys in the
+                       Paste your i18n JSON data here to replace keys in the
                       script view.
                     </p>
                     <textarea
                       className="flex-grow border border-slate-300 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 p-2 font-mono text-sm rounded mb-4"
-                      placeholder='{&#10;  "EventKey.1": "Hello!"&#10;}'
+                      placeholder='{&#10;"EventKey.1": "Hello!"&#10;}'
                       value={i18nText}
                       onChange={(e) => setI18nText(e.target.value)}
                     />
@@ -4751,7 +5014,7 @@ export default function App() {
 
               <section>
                 <h2 className="text-xl font-semibold mb-4 text-slate-700 dark:text-slate-300">
-                  3. Timeline Workspace
+                   3. Timeline Workspace
                 </h2>
                 <div className="flex flex-col gap-3">
                   {timeline.map((cmd, index) => (
@@ -5175,6 +5438,337 @@ export default function App() {
                 >
                   Copy Event
                 </button>
+              </div>
+            </div>
+          </div>
+        )}
+
+{activeTool === "animation" && (
+          <div>
+            <div className="max-w-6xl mx-auto mb-6">
+              <button
+                onClick={() => setActiveTool("home")}
+                className="text-fuchsia-600 dark:text-fuchsia-400 font-bold hover:underline flex items-center gap-2"
+              >
+                Back to Toolkit Hub
+              </button>
+            </div>
+            <div className="max-w-6xl mx-auto bg-white dark:bg-slate-900 p-8 rounded-xl shadow-lg border border-slate-200 dark:border-slate-700 transition-colors">
+              <h1 className="text-3xl font-bold text-fuchsia-700 dark:text-fuchsia-400 mb-6">
+                Animation Builder
+              </h1>
+
+              <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
+                <div className="flex flex-col gap-6">
+                  <div className="p-4 bg-slate-50 dark:bg-slate-800 rounded border border-slate-200 dark:border-slate-700">
+                    <label className="block text-sm font-bold text-slate-700 dark:text-slate-300 mb-2">
+                      Upload Spritesheet
+                    </label>
+                    <input
+                      type="file"
+                      accept="image/png, image/jpeg"
+                      onChange={handleImageUpload}
+                      className="w-full text-sm text-slate-500 dark:text-slate-400 file:mr-4 file:py-2 file:px-4 file:rounded file:border-0 file:text-sm file:font-semibold file:bg-fuchsia-50 file:text-fuchsia-700 hover:file:bg-fuchsia-100 dark:file:bg-slate-700 dark:file:text-fuchsia-400 cursor-pointer"
+                    />
+                  </div>
+
+                  <div className="p-4 bg-slate-50 dark:bg-slate-800 rounded border border-slate-200 dark:border-slate-700 flex flex-col gap-4">
+                    <div className="flex gap-4">
+                      <div className="flex-1">
+                        <label className="block text-xs font-bold text-slate-500 mb-1">
+                          Sprite Width
+                        </label>
+                        <input
+                          type="number"
+                          value={spriteWidth}
+                          onChange={(e) =>
+                            setSpriteWidth(Number(e.target.value))
+                          }
+                          className="w-full p-2 rounded border border-slate-300 dark:border-slate-600 bg-white dark:bg-slate-700 dark:text-white"
+                        />
+                      </div>
+                      <div className="flex-1">
+                        <label className="block text-xs font-bold text-slate-500 mb-1">
+                          Sprite Height
+                        </label>
+                        <input
+                          type="number"
+                          value={spriteHeight}
+                          onChange={(e) =>
+                            setSpriteHeight(Number(e.target.value))
+                          }
+                          className="w-full p-2 rounded border border-slate-300 dark:border-slate-600 bg-white dark:bg-slate-700 dark:text-white"
+                        />
+                      </div>
+                    </div>
+                    <div className="flex gap-4 items-center">
+                      <label className="flex items-center gap-2 cursor-pointer font-bold text-slate-600 dark:text-slate-300">
+                        <input 
+                          type="checkbox" 
+                          checked={hasAdvancedPhases} 
+                          onChange={(e) => setHasAdvancedPhases(e.target.checked)} 
+                          className="accent-fuchsia-500 w-4 h-4" 
+                        />
+                        Loop Animation?
+                      </label>
+                    </div>
+                  </div>
+
+                  <div className="p-4 bg-slate-50 dark:bg-slate-800 rounded border border-slate-200 dark:border-slate-700 flex flex-col gap-4">
+                    <div>
+                      <label className="block text-xs font-bold text-slate-500 mb-1">
+                        Filename on preview export
+                      </label>
+                      <input
+                        type="text"
+                        value={animName}
+                        onChange={(e) => setAnimName(e.target.value)}
+                        className="w-full p-2 rounded border border-slate-300 dark:border-slate-600 bg-white dark:bg-slate-700 dark:text-white"
+                      />
+                    </div>
+                    <div>
+                      <label className="block text-xs font-bold text-slate-500 mb-1">
+                        Extra Data \ Text (if applicable)
+                      </label>
+                      <input
+                        type="text"
+                        value={animMessage}
+                        onChange={(e) => setAnimMessage(e.target.value)}
+                        placeholder="e.g. true (for loop)"
+                        className="w-full p-2 rounded border border-slate-300 dark:border-slate-600 bg-white dark:bg-slate-700 dark:text-white"
+                      />
+                    </div>
+                    <div>
+                      <label className="block text-xs font-bold text-slate-500 mb-1">
+                        Preview/GIF Speed (ms) *Only affects preview. No effect in game*
+                      </label>
+                      <input
+                        type="number"
+                        value={animDuration}
+                        onChange={(e) => setAnimDuration(Number(e.target.value))}
+                        className="w-full p-2 rounded border border-slate-300 dark:border-slate-600 bg-white dark:bg-slate-700 dark:text-white"
+                      />
+                    </div>
+                    <label className="flex items-center gap-2 cursor-pointer">
+                      <input
+                        type="checkbox"
+                        checked={animLayingDown}
+                        onChange={(e) => setAnimLayingDown(e.target.checked)}
+                        className="accent-fuchsia-500 w-4 h-4"
+                      />
+                      <span className="text-sm font-bold text-slate-600 dark:text-slate-300">
+                        Laying Down (Hides Shadow)
+                      </span>
+                    </label>
+                    <div className="flex gap-4">
+                      <div className="flex-1">
+                        <label className="block text-xs font-bold text-slate-500 mb-1">
+                          Offset X
+                        </label>
+                        <input
+                          type="number"
+                          value={animOffsetX}
+                          onChange={(e) => setAnimOffsetX(Number(e.target.value))}
+                          className="w-full p-2 rounded border border-slate-300 dark:border-slate-600 bg-white dark:bg-slate-700 dark:text-white"
+                        />
+                      </div>
+                      <div className="flex-1">
+                        <label className="block text-xs font-bold text-slate-500 mb-1">
+                          Offset Y
+                        </label>
+                        <input
+                          type="number"
+                          value={animOffsetY}
+                          onChange={(e) => setAnimOffsetY(Number(e.target.value))}
+                          className="w-full p-2 rounded border border-slate-300 dark:border-slate-600 bg-white dark:bg-slate-700 dark:text-white"
+                        />
+                      </div>
+                    </div>
+                  </div>
+                </div>
+
+                <div className="flex flex-col gap-4 p-4 bg-slate-50 dark:bg-slate-800 rounded border border-slate-200 dark:border-slate-700 overflow-auto max-h-[60vh]">
+                  <h3 className="font-bold text-slate-700 dark:text-slate-300">Source Frames</h3>
+                  <p className="text-xs text-slate-500">Double-click grid boxes to push frame to Main Sequence.</p>
+                  {animImage ? (
+                    <div
+                      className="relative inline-block border border-slate-400 select-none self-start shadow-md max-w-none"
+                      style={{ 
+                        ...(isDarkMode ? darkCheckerboardStyle : checkerboardStyle), 
+                        backgroundSize: '32px 32px',
+                        width: animImageWidth * 3,
+                        height: animImageHeight * 3
+                      }}
+                    >
+                      <img 
+                        src={animImage} 
+                        alt="Spritesheet" 
+                        className="max-w-none block absolute top-0 left-0" 
+                        style={{ 
+                          width: animImageWidth * 3, 
+                          height: animImageHeight * 3, 
+                          imageRendering: 'pixelated' 
+                        }} 
+                        draggable={false} 
+                      />
+                      <div 
+                        className="absolute top-0 left-0 w-full h-full pointer-events-none grid content-start justify-start" 
+                        style={{ 
+                          gridTemplateColumns: `repeat(${cols}, ${spriteWidth * 3}px)`, 
+                          gridTemplateRows: `repeat(${rows}, ${spriteHeight * 3}px)` 
+                        }}
+                      >
+                        {Array.from({ length: totalFrames }).map((_, i) => (
+                          <div
+                            key={i}
+                            onDoubleClick={() => setAnimRepeat([...animRepeat, i])}
+                            className="border border-fuchsia-400 hover:bg-fuchsia-500/40 cursor-pointer pointer-events-auto flex items-center justify-center text-xs text-white opacity-0 hover:opacity-100 font-bold bg-black/20 transition-opacity"
+                          >
+                            {i}
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  ) : (
+                    <div className="text-slate-400 text-sm italic py-12 text-center">Upload an image to view frames.</div>
+                  )}
+                </div>
+
+                <div className="flex flex-col gap-6">
+                  <div className="p-4 bg-slate-50 dark:bg-slate-800 rounded border border-slate-200 dark:border-slate-700 flex flex-col items-center">
+                    <h3 className="font-bold text-slate-700 dark:text-slate-300 w-full text-left mb-4">
+                      Live Preview
+                    </h3>
+                    <div
+                      className="border-2 border-slate-400 rounded overflow-hidden shadow-inner"
+                      style={{
+                        width: spriteWidth * 4,
+                        height: spriteHeight * 4,
+                        ...(isDarkMode ? darkCheckerboardStyle : checkerboardStyle),
+                      }}
+                    >
+                      {animImage && activeAnimFrames.length > 0 && (
+                        <div
+                          style={{
+                            width: "100%",
+                            height: "100%",
+                            backgroundImage: `url(${animImage})`,
+                            backgroundPosition: `-${activeCol * spriteWidth * 4}px -${activeRow * spriteHeight * 4}px`,
+                            backgroundSize: `${animImageWidth * 4}px ${animImageHeight * 4}px`,
+                            imageRendering: "pixelated",
+                          }}
+                        />
+                      )}
+                    </div>
+                    <button
+                      onClick={exportAsGif}
+                      disabled={!animImage || activeAnimFrames.length === 0}
+                      className="mt-6 w-full bg-fuchsia-600 hover:bg-fuchsia-700 text-white font-bold py-2 px-4 rounded disabled:opacity-50 transition-colors"
+                    >
+                      Export Preview as GIF
+                    </button>
+                  </div>
+
+                  <div className="flex flex-col gap-2">
+                    {hasAdvancedPhases && (
+                      <div className="p-2 border border-slate-300 dark:border-slate-700 rounded bg-white dark:bg-slate-800">
+                        <h4 className="text-xs font-bold uppercase text-slate-500 mb-2">First sprite of the Loop</h4>
+                        <div
+                          className="flex gap-2 overflow-x-auto min-h-[50px] p-2 bg-slate-50 dark:bg-slate-900/50 rounded border border-dashed border-slate-300 dark:border-slate-600 items-center"
+                          onDragOver={handleDragOver}
+                          onDrop={(e) => handleDrop(e, "entry", animEntry.length)}
+                        >
+                          {animEntry.map((frame, i) => (
+                            <div
+                              key={`entry-${i}`}
+                              draggable
+                              onDragStart={(e) => handleDragStart(e, "entry", i)}
+                              onDrop={(e) => { e.stopPropagation(); handleDrop(e, "entry", i); }}
+                              onDoubleClick={() => setAnimEntry(animEntry.filter((_, idx) => idx !== i))}
+                              className="w-10 h-10 border border-fuchsia-400 bg-fuchsia-100 dark:bg-fuchsia-900/60 flex items-center justify-center text-sm font-bold text-fuchsia-700 dark:text-fuchsia-300 cursor-move rounded shrink-0 relative group"
+                            >
+                              {frame}
+                              <div className="absolute -top-1 -right-1 bg-red-500 text-white w-4 h-4 rounded-full text-[10px] flex items-center justify-center opacity-0 group-hover:opacity-100 pointer-events-none">x</div>
+                            </div>
+                          ))}
+                          {animEntry.length === 0 && <span className="text-xs text-slate-400 italic pointer-events-none">Empty</span>}
+                        </div>
+                      </div>
+                    )}
+
+                    <div className="p-2 border border-slate-300 dark:border-slate-700 rounded bg-white dark:bg-slate-800">
+                      <h4 className="text-xs font-bold uppercase text-slate-500 mb-2">Main Animation Sequence</h4>
+                      <div
+                        className="flex gap-2 overflow-x-auto min-h-[50px] p-2 bg-slate-50 dark:bg-slate-900/50 rounded border border-dashed border-slate-300 dark:border-slate-600 items-center"
+                        onDragOver={handleDragOver}
+                        onDrop={(e) => handleDrop(e, "repeat", animRepeat.length)}
+                      >
+                        {animRepeat.map((frame, i) => (
+                          <div
+                            key={`repeat-${i}`}
+                            draggable
+                            onDragStart={(e) => handleDragStart(e, "repeat", i)}
+                            onDrop={(e) => { e.stopPropagation(); handleDrop(e, "repeat", i); }}
+                            onDoubleClick={() => setAnimRepeat(animRepeat.filter((_, idx) => idx !== i))}
+                            className="w-10 h-10 border border-fuchsia-400 bg-fuchsia-100 dark:bg-fuchsia-900/60 flex items-center justify-center text-sm font-bold text-fuchsia-700 dark:text-fuchsia-300 cursor-move rounded shrink-0 relative group"
+                          >
+                            {frame}
+                            <div className="absolute -top-1 -right-1 bg-red-500 text-white w-4 h-4 rounded-full text-[10px] flex items-center justify-center opacity-0 group-hover:opacity-100 pointer-events-none">x</div>
+                          </div>
+                        ))}
+                        {animRepeat.length === 0 && <span className="text-xs text-slate-400 italic pointer-events-none">Empty</span>}
+                      </div>
+                    </div>
+
+                    {hasAdvancedPhases && (
+                      <div className="p-2 border border-slate-300 dark:border-slate-700 rounded bg-white dark:bg-slate-800">
+                        <h4 className="text-xs font-bold uppercase text-slate-500 mb-2">Last Sprite of the loop</h4>
+                        <div
+                          className="flex gap-2 overflow-x-auto min-h-[50px] p-2 bg-slate-50 dark:bg-slate-900/50 rounded border border-dashed border-slate-300 dark:border-slate-600 items-center"
+                          onDragOver={handleDragOver}
+                          onDrop={(e) => handleDrop(e, "leaving", animLeaving.length)}
+                        >
+                          {animLeaving.map((frame, i) => (
+                            <div
+                              key={`leaving-${i}`}
+                              draggable
+                              onDragStart={(e) => handleDragStart(e, "leaving", i)}
+                              onDrop={(e) => { e.stopPropagation(); handleDrop(e, "leaving", i); }}
+                              onDoubleClick={() => setAnimLeaving(animLeaving.filter((_, idx) => idx !== i))}
+                              className="w-10 h-10 border border-fuchsia-400 bg-fuchsia-100 dark:bg-fuchsia-900/60 flex items-center justify-center text-sm font-bold text-fuchsia-700 dark:text-fuchsia-300 cursor-move rounded shrink-0 relative group"
+                            >
+                              {frame}
+                              <div className="absolute -top-1 -right-1 bg-red-500 text-white w-4 h-4 rounded-full text-[10px] flex items-center justify-center opacity-0 group-hover:opacity-100 pointer-events-none">x</div>
+                            </div>
+                          ))}
+                          {animLeaving.length === 0 && <span className="text-xs text-slate-400 italic pointer-events-none">Empty</span>}
+                        </div>
+                      </div>
+                    )}
+                  </div>
+                </div>
+              </div>
+
+              <div className="mt-8 border-t border-slate-200 dark:border-slate-700 pt-6">
+                <div className="flex justify-between items-center mb-2">
+                  <label className="block text-xs font-bold text-slate-500 uppercase tracking-wider">
+                    Generated animationDescriptions String
+                  </label>
+                </div>
+                <div className="flex gap-4">
+                  <input
+                    type="text"
+                    readOnly
+                    value={generatedAnimString}
+                    className="flex-grow bg-slate-800 border border-slate-700 text-fuchsia-400 p-3 rounded font-mono text-sm outline-none"
+                  />
+                  <button
+                    onClick={() => copyToClipboard(generatedAnimString)}
+                    className="bg-fuchsia-600 hover:bg-fuchsia-700 text-white font-bold py-2 px-6 rounded shadow transition-colors"
+                  >
+                    Copy
+                  </button>
+                </div>
               </div>
             </div>
           </div>
